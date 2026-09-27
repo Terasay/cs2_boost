@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -42,5 +41,5 @@ export default function Register() {
     <form className="account-panel" onSubmit={submit}><h2>{user?(lang==="ru"?"Подтвердите заявку":"Confirm request"):(lang==="ru"?"Создать аккаунт":"Create account")}</h2>{user?<p className="signed-as">{lang==="ru"?"Вы вошли как":"Signed in as"} <b>{user.email}</b></p>:<><label htmlFor="email">Email</label><Input id="email" type="email" required autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)}/><label htmlFor="password">{lang==="ru"?"Пароль":"Password"}</label><Input id="password" type="password" minLength={10} maxLength={128} required autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)}/><small>{lang==="ru"?"Минимум 10 символов.":"At least 10 characters."}</small></>}
       <label className="risk-check"><Checkbox checked={accepted} onCheckedChange={value=>setAccepted(value===true)}/><span>{lang==="ru"?"Я понимаю, что буст может нарушать правила Steam и FACEIT и привести к ограничениям аккаунта.":"I understand that boosting may violate Steam and FACEIT rules and lead to account restrictions."}</span></label>
       <p className="credential-note">{lang==="ru"?"Не указывайте пароль Steam и код Steam Guard в этой форме или чате.":"Do not enter your Steam password or Steam Guard code here or in the chat."}</p>
-      {error&&<p className="error" role="alert">{error}</p>}<Button type="submit" className="account-cta" disabled={loading||!draft}>{loading?(lang==="ru"?"Отправляем…":"Submitting…"):(lang==="ru"?"Отправить заявку":"Submit request")}<ArrowRight size={18}/></Button>{!user&&<p className="account-footnote">{lang==="ru"?"Уже есть аккаунт?":"Already have an account?"} <Link href="/login">{lang==="ru"?"Войти":"Sign in"}</Link></p>}</form></div></AccountShell>;
+      {error&&<p className="error" role="alert">{error}</p>}<Button type="submit" className="account-cta" disabled={loading||!draft}>{loading?(lang==="ru"?"Отправляем…":"Submitting…"):(lang==="ru"?"Отправить заявку":"Submit request")}<ArrowRight size={18}/></Button>{!user&&<p className="account-footnote">{lang==="ru"?"Уже есть аккаунт?":"Already have an account?"} <a href="/login">{lang==="ru"?"Войти":"Sign in"}</a></p>}</form></div></AccountShell>;
 }

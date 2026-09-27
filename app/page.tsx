@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { ArrowRight, Crosshair, Menu, MessageSquare, ShieldCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,9 +85,9 @@ export default function Home() {
   return <div className="site">
     <div className="topbar"><span>COUNTER-STRIKE 2</span><span>PREMIER / FACEIT</span></div>
     <header className="header wrap">
-      <Link href="/" className="brand"><span className="brand-mark"><Crosshair size={22}/></span>CS2<span>BOOST</span></Link>
+      <a href="/" className="brand"><span className="brand-mark"><Crosshair size={22}/></span>CS2<span>BOOST</span></a>
       <nav className={menu?"nav open":"nav"}><a href="#services" onClick={()=>setMenu(false)}>{t.services}</a><a href="#process" onClick={()=>setMenu(false)}>{t.process}</a><a href="#faq" onClick={()=>setMenu(false)}>{t.faq}</a></nav>
-      <div className="header-actions"><div className="language"><button className={lang==="ru"?"active":""} onClick={()=>setLanguage("ru")}>RU</button><span>/</span><button className={lang==="en"?"active":""} onClick={()=>setLanguage("en")}>EN</button></div><Link href="/login" className="login-link">{t.login} <ArrowRight size={16}/></Link><button className="menu-button" aria-label={menu?"Close menu":"Open menu"} aria-expanded={menu} onClick={()=>setMenu(!menu)}>{menu?<X/>:<Menu/>}</button></div>
+      <div className="header-actions"><div className="language"><button className={lang==="ru"?"active":""} onClick={()=>setLanguage("ru")}>RU</button><span>/</span><button className={lang==="en"?"active":""} onClick={()=>setLanguage("en")}>EN</button></div><a href="/login" className="login-link">{t.login} <ArrowRight size={16}/></a><button className="menu-button" aria-label={menu?"Close menu":"Open menu"} aria-expanded={menu} onClick={()=>setMenu(!menu)}>{menu?<X/>:<Menu/>}</button></div>
     </header>
     <main>
       <section className="hero wrap">

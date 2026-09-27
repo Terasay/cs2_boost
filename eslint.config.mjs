@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
   ]),
   {
+    files: ["app/**/*.{ts,tsx}"],
+    rules: {
+      "@next/next/no-html-link-for-pages": "off",
+    },
+  },
+  {
     files: ["components/ui/**/*.{ts,tsx}", "hooks/use-mobile.ts"],
     rules: {
       "@typescript-eslint/no-unused-vars": "off",

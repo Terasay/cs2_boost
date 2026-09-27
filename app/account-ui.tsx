@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { ArrowLeft, Crosshair } from "lucide-react";
 
 export type User = { id: string; email: string; role: "client" | "admin" };
@@ -15,7 +14,7 @@ export function useLanguage() {
 
 export function AccountShell({ children, back = "/", backLabel }: { children: React.ReactNode; back?: string; backLabel?: string }) {
   const lang = useLanguage();
-  return <div className="account-page"><header className="account-header wrap"><Link href="/" className="brand"><span className="brand-mark"><Crosshair size={22}/></span>CS2<span>BOOST</span></Link><Link href={back} className="account-back"><ArrowLeft size={17}/>{backLabel ?? (lang === "ru" ? "На главную" : "Home")}</Link></header><main className="account-main wrap">{children}</main></div>;
+  return <div className="account-page"><header className="account-header wrap"><a href="/" className="brand"><span className="brand-mark"><Crosshair size={22}/></span>CS2<span>BOOST</span></a><a href={back} className="account-back"><ArrowLeft size={17}/>{backLabel ?? (lang === "ru" ? "На главную" : "Home")}</a></header><main className="account-main wrap">{children}</main></div>;
 }
 
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
