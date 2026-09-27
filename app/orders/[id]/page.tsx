@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/set-state-in-effect, @next/next/no-html-link-for-pages */
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -26,7 +25,7 @@ export default function OrderDetail() {
   const [error,setError]=useState("");
   const [sending,setSending]=useState(false);
   const load=useCallback(async()=>{try{const result=await api<Detail>(`/api/orders/${id}`);setData(result);setPrice(result.order.quotedPrice?.toString()??"");setDeadline(result.order.deadline??"");setStatus(result.order.status)}catch(reason){setError(reason instanceof Error?reason.message:"Error")}},[id]);
-  useEffect(()=>{load();const timer=setInterval(load,15000);return()=>clearInterval(timer)},[load]);
+  useEffect(()=>{const initial=setTimeout(load,0);const timer=setInterval(load,15000);return()=>{clearTimeout(initial);clearInterval(timer)}},[load]);
   async function send(event:React.FormEvent){event.preventDefault();if(!body.trim())return;setSending(true);setError("");try{await api(`/api/orders/${id}/messages`,{method:"POST",body:JSON.stringify({body})});setBody("");await load()}catch(reason){setError(reason instanceof Error?reason.message:"Error")}finally{setSending(false)}}
   async function save(){setError("");try{await api(`/api/orders/${id}`,{method:"PATCH",body:JSON.stringify({status,quotedPrice:price,deadline})});await load()}catch(reason){setError(reason instanceof Error?reason.message:"Error")}}
   async function accept(){setError("");try{await api(`/api/orders/${id}`,{method:"PATCH",body:JSON.stringify({action:"accept"})});await load()}catch(reason){setError(reason instanceof Error?reason.message:"Error")}}

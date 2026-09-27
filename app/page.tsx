@@ -1,7 +1,8 @@
-/* eslint-disable react-hooks/set-state-in-effect, @next/next/no-html-link-for-pages */
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
 import { ArrowRight, Crosshair, Menu, MessageSquare, ShieldCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,8 +25,7 @@ const words = {
     continue:"Продолжить оформление",accountLater:"Аккаунт создаётся на следующем шаге",invalid:"Укажите текущий и желаемый рейтинг. Цель должна быть выше текущего.",
     serviceTitle:"Под ваш формат игры",s1:"Буст рейтинга",s1d:"Выберите Premier или FACEIT и укажите свой целевой рейтинг.",s2:"Калибровка",s2d:"Согласуем цель и условия перед началом матчей.",s3:"Два способа",s3d:"Играйте вместе с исполнителем или выберите выполнение на аккаунте.",
     processTitle:"Три шага до заказа",p1:"Задайте цель",p1d:"Выберите площадку, услугу и желаемый результат.",p2:"Согласуйте условия",p2d:"Администратор подтвердит цену и срок.",p3:"Следите за работой",p3d:"Статус заказа и чат доступны в личном кабинете.",
-    faqTitle:"Перед оформлением",q1:"Когда будет известна цена?",a1:"После заявки администратор рассчитает стоимость по вашим параметрам. Вы увидите её до оплаты.",q2:"Нужно ли создавать аккаунт сразу?",a2:"Нет. Сначала выберите параметры, затем создайте аккаунт для оформления заказа.",q3:"Можно ли играть вместе с исполнителем?",a3:"Да, выберите «Игра вместе» в форме заказа.",
-    footer:"Первая версия сервиса. Цены и сроки подтверждаются индивидуально."
+    faqTitle:"Перед оформлением",q1:"Когда будет известна цена?",a1:"После заявки администратор рассчитает стоимость по вашим параметрам. Вы увидите её до оплаты.",q2:"Нужно ли создавать аккаунт сразу?",a2:"Нет. Сначала выберите параметры, затем создайте аккаунт для оформления заказа.",q3:"Можно ли играть вместе с исполнителем?",a3:"Да, выберите «Игра вместе» в форме заказа."
   },
   en: {
     services:"Services",process:"How it works",faq:"FAQ",login:"Sign in",eyebrow:"CS2 / PREMIER / FACEIT",
@@ -37,8 +37,7 @@ const words = {
     continue:"Continue to order",accountLater:"Create an account in the next step",invalid:"Enter your current and target rating. The target must be higher.",
     serviceTitle:"Your game, your format",s1:"Rating boost",s1d:"Choose Premier or FACEIT and set your target rating.",s2:"Calibration",s2d:"Agree on the goal and terms before matches start.",s3:"Two methods",s3d:"Play with the booster or arrange a piloted order.",
     processTitle:"Three steps to order",p1:"Set your goal",p1d:"Choose the platform, service and target.",p2:"Agree on terms",p2d:"An admin confirms the price and deadline.",p3:"Track progress",p3d:"Order status and chat are available in your account.",
-    faqTitle:"Before you order",q1:"When will I know the price?",a1:"An admin will price your request after reviewing the details. You see the quote before paying.",q2:"Do I need an account right away?",a2:"No. Configure your request first, then create an account to submit it.",q3:"Can I play with the booster?",a3:"Yes. Choose “Play together” in the order form.",
-    footer:"First version of the service. Prices and deadlines are confirmed individually."
+    faqTitle:"Before you order",q1:"When will I know the price?",a1:"An admin will price your request after reviewing the details. You see the quote before paying.",q2:"Do I need an account right away?",a2:"No. Configure your request first, then create an account to submit it.",q3:"Can I play with the booster?",a3:"Yes. Choose “Play together” in the order form."
   }
 };
 
@@ -52,7 +51,7 @@ export default function Home() {
   const [error,setError]=useState("");
   const [menu,setMenu]=useState(false);
   const t=words[lang];
-  useEffect(()=>{const saved=localStorage.getItem("cs2-lang");if(saved==="ru"||saved==="en"){setLang(saved);document.documentElement.lang=saved}},[]);
+  useEffect(()=>{const timer=setTimeout(()=>{const saved=localStorage.getItem("cs2-lang");if(saved==="ru"||saved==="en"){setLang(saved);document.documentElement.lang=saved}},0);return()=>clearTimeout(timer)},[]);
   useEffect(()=>{
     type Context = { registerTool: (tool: { name:string; title:string; description:string; inputSchema:object; annotations:{readOnlyHint:boolean}; execute:(input:unknown)=>Promise<unknown> }, options:{signal:AbortSignal})=>void|Promise<void> };
     const context=(document as Document & {modelContext?:Context}).modelContext;
@@ -87,13 +86,13 @@ export default function Home() {
   return <div className="site">
     <div className="topbar"><span>COUNTER-STRIKE 2</span><span>PREMIER / FACEIT</span></div>
     <header className="header wrap">
-      <a href="/" className="brand"><span className="brand-mark"><Crosshair size={22}/></span>CS2<span>BOOST</span></a>
+      <Link href="/" className="brand"><span className="brand-mark"><Crosshair size={22}/></span>CS2<span>BOOST</span></Link>
       <nav className={menu?"nav open":"nav"}><a href="#services" onClick={()=>setMenu(false)}>{t.services}</a><a href="#process" onClick={()=>setMenu(false)}>{t.process}</a><a href="#faq" onClick={()=>setMenu(false)}>{t.faq}</a></nav>
-      <div className="header-actions"><div className="language"><button className={lang==="ru"?"active":""} onClick={()=>setLanguage("ru")}>RU</button><span>/</span><button className={lang==="en"?"active":""} onClick={()=>setLanguage("en")}>EN</button></div><a href="/login" className="login-link">{t.login} <ArrowRight size={16}/></a><button className="menu-button" aria-label={menu?"Close menu":"Open menu"} aria-expanded={menu} onClick={()=>setMenu(!menu)}>{menu?<X/>:<Menu/>}</button></div>
+      <div className="header-actions"><div className="language"><button className={lang==="ru"?"active":""} onClick={()=>setLanguage("ru")}>RU</button><span>/</span><button className={lang==="en"?"active":""} onClick={()=>setLanguage("en")}>EN</button></div><Link href="/login" className="login-link">{t.login} <ArrowRight size={16}/></Link><button className="menu-button" aria-label={menu?"Close menu":"Open menu"} aria-expanded={menu} onClick={()=>setMenu(!menu)}>{menu?<X/>:<Menu/>}</button></div>
     </header>
     <main>
       <section className="hero wrap">
-        <div className="hero-copy"><span className="eyebrow">{t.eyebrow}</span><h1>{t.title1}<br/><em>{t.title2}</em></h1><p>{t.intro}</p><div className="hero-points"><span><Crosshair size={18}/>{t.benefit1}</span><span><MessageSquare size={18}/>{t.benefit2}</span></div><div className="radar" aria-hidden="true"><i/><i/><i/><b>+</b></div></div>
+        <div className="hero-copy"><span className="eyebrow">{t.eyebrow}</span><h1>{t.title1}<br/><em>{t.title2}</em></h1><p>{t.intro}</p><div className="hero-points"><span><Crosshair size={18}/>{t.benefit1}</span><span><MessageSquare size={18}/>{t.benefit2}</span></div><div className="hero-media"><Image src="/hero-arena.png" alt="" width={1536} height={1024} priority/></div></div>
         <div className="quote-card" id="calculator">
           <div className="quote-heading"><div><span className="kicker">{t.config}</span><h2>{t.configTitle}</h2></div><small>01 / 03</small></div>
           <div className="quote-body">
@@ -111,6 +110,6 @@ export default function Home() {
       <section className="content-block" id="process"><div className="wrap"><span className="kicker">{t.process.toUpperCase()}</span><h2>{t.processTitle}</h2><div className="steps"><div><strong>01</strong><h3>{t.p1}</h3><p>{t.p1d}</p></div><div><strong>02</strong><h3>{t.p2}</h3><p>{t.p2d}</p></div><div><strong>03</strong><h3>{t.p3}</h3><p>{t.p3d}</p></div></div></div></section>
       <section className="content-block alt" id="faq"><div className="wrap faq-layout"><div><span className="kicker">FAQ</span><h2>{t.faqTitle}</h2></div><div className="faq-list"><details><summary>{t.q1}</summary><p>{t.a1}</p></details><details><summary>{t.q2}</summary><p>{t.a2}</p></details><details><summary>{t.q3}</summary><p>{t.a3}</p></details></div></div></section>
     </main>
-    <footer><div className="wrap"><strong>CS2<span>BOOST</span></strong><p>{t.footer}</p><a href="#calculator">↑ TOP</a></div></footer>
+    <footer><div className="wrap"><strong>CS2<span>BOOST</span></strong><span className="footer-platforms">PREMIER / FACEIT</span><a href="#calculator">↑ TOP</a></div></footer>
   </div>;
 }
