@@ -14,6 +14,13 @@ export const sessions = sqliteTable("sessions", {
   expiresAt: integer("expires_at").notNull(),
 });
 
+export const authAttempts = sqliteTable("auth_attempts", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull(),
+  windowStart: integer("window_start").notNull(),
+  blockedUntil: integer("blocked_until").notNull(),
+});
+
 export const orders = sqliteTable("orders", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id),

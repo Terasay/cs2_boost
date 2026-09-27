@@ -49,6 +49,7 @@ export default function Home() {
   const [target,setTarget]=useState("");
   const [error,setError]=useState("");
   const [menu,setMenu]=useState(false);
+  const [faqOpen,setFaqOpen]=useState<number|null>(null);
   const t=words[lang];
   useEffect(()=>{const timer=setTimeout(()=>{const saved=localStorage.getItem("cs2-lang");if(saved==="ru"||saved==="en"){setLang(saved);document.documentElement.lang=saved}},0);return()=>clearTimeout(timer)},[]);
   useEffect(()=>{
@@ -73,6 +74,13 @@ export default function Home() {
       }
     },{signal:lifecycle.signal})).catch(()=>{});
     return()=>lifecycle.abort();
+  },[]);
+  useEffect(()=>{
+    if(window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+    const elements=document.querySelectorAll<HTMLElement>(".content-block h2,.cards article,.steps>div,.faq-layout>div");
+    const observer=new IntersectionObserver(entries=>{for(const entry of entries){if(entry.isIntersecting){entry.target.classList.add("is-visible");observer.unobserve(entry.target)}}},{threshold:.12,rootMargin:"0px 0px -35px 0px"});
+    elements.forEach(element=>{element.classList.add("scroll-reveal");observer.observe(element)});
+    return()=>observer.disconnect();
   },[]);
   function setLanguage(value:Lang){setLang(value);localStorage.setItem("cs2-lang",value);document.documentElement.lang=value}
   function next(){
@@ -107,8 +115,9 @@ export default function Home() {
       </section>
       <section className="content-block alt" id="services"><div className="wrap"><span className="kicker">{t.services.toUpperCase()}</span><h2>{t.serviceTitle}</h2><div className="cards"><article><span>01</span><Crosshair/><h3>{t.s1}</h3><p>{t.s1d}</p></article><article><span>02</span><ShieldCheck/><h3>{t.s2}</h3><p>{t.s2d}</p></article><article><span>03</span><MessageSquare/><h3>{t.s3}</h3><p>{t.s3d}</p></article></div></div></section>
       <section className="content-block" id="process"><div className="wrap"><span className="kicker">{t.process.toUpperCase()}</span><h2>{t.processTitle}</h2><div className="steps"><div><strong>01</strong><h3>{t.p1}</h3><p>{t.p1d}</p></div><div><strong>02</strong><h3>{t.p2}</h3><p>{t.p2d}</p></div><div><strong>03</strong><h3>{t.p3}</h3><p>{t.p3d}</p></div></div></div></section>
-      <section className="content-block alt" id="faq"><div className="wrap faq-layout"><div><span className="kicker">FAQ</span><h2>{t.faqTitle}</h2></div><div className="faq-list"><details><summary>{t.q1}</summary><p>{t.a1}</p></details><details><summary>{t.q2}</summary><p>{t.a2}</p></details><details><summary>{t.q3}</summary><p>{t.a3}</p></details></div></div></section>
+      <section className="content-block alt" id="faq"><div className="wrap faq-layout"><div><span className="kicker">FAQ</span><h2>{t.faqTitle}</h2></div><div className="faq-list">{[[t.q1,t.a1],[t.q2,t.a2],[t.q3,t.a3]].map(([question,answer],index)=><div className={faqOpen===index?"faq-item open":"faq-item"} key={question}><button className="faq-question" aria-expanded={faqOpen===index} onClick={()=>setFaqOpen(faqOpen===index?null:index)}>{question}<span aria-hidden="true">+</span></button><div className="faq-answer" aria-hidden={faqOpen!==index}><div><p>{answer}</p></div></div></div>)}</div></div></section>
     </main>
     <footer><div className="wrap"><strong>CS2<span>BOOST</span></strong><span className="footer-platforms">PREMIER / FACEIT</span><a href="#calculator">↑ TOP</a></div></footer>
   </div>;
 }
+
