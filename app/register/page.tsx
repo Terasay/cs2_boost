@@ -5,7 +5,8 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { AccountShell, api, Draft, User, useLanguage } from "../account-ui";
+import { writeStorage } from "@/lib/browser-storage";
+import { AccountShell, api, readDraft, Draft, User, useLanguage } from "../account-ui";
 
 export default function Register() {
   const lang = useLanguage();
@@ -16,22 +17,24 @@ export default function Register() {
   const [accepted,setAccepted]=useState(false);
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
+  const [ready,setReady]=useState(false);
 
   useEffect(()=>{
-    const timer=setTimeout(()=>{try { const saved=sessionStorage.getItem("cs2-draft"); if(saved) setDraft(JSON.parse(saved)); } catch {}},0);
-    api<{user:User|null}>("/api/auth/me").then(data=>setUser(data.user)).catch(()=>{});
+    const timer=setTimeout(()=>{setDraft(readDraft())},0);
+    api<{user:User|null}>("/api/auth/me").then(data=>{setUser(data.user);setReady(true)}).catch(reason=>setError(reason instanceof Error?reason.message:"Error"));
     return()=>clearTimeout(timer);
   },[]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if(loading||!ready)return;
     if(!draft){window.location.assign("/#calculator");return}
     if(!accepted){setError(lang==="ru"?"Подтвердите ознакомление с рисками.":"Please acknowledge the risks.");return}
     setLoading(true);setError("");
     try{
-      if(!user) await api("/api/auth/register",{method:"POST",body:JSON.stringify({email,password})});
+      if(!user){const auth=await api<{user:User}>("/api/auth/register",{method:"POST",body:JSON.stringify({email,password})});setUser(auth.user);setPassword("")}
       const result=await api<{id:string}>("/api/orders",{method:"POST",body:JSON.stringify({...draft,riskAccepted:true})});
-      sessionStorage.removeItem("cs2-draft");
+      writeStorage("sessionStorage","cs2-draft",null);
       window.location.assign(`/orders/${result.id}`);
     }catch(reason){setError(reason instanceof Error?reason.message:"Error");setLoading(false)}
   }
@@ -41,5 +44,5 @@ export default function Register() {
     <form className="account-panel" onSubmit={submit}><h2>{user?(lang==="ru"?"Подтвердите заявку":"Confirm request"):(lang==="ru"?"Создать аккаунт":"Create account")}</h2>{user?<p className="signed-as">{lang==="ru"?"Вы вошли как":"Signed in as"} <b>{user.email}</b></p>:<><label htmlFor="email">Email</label><Input id="email" type="email" required autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)}/><label htmlFor="password">{lang==="ru"?"Пароль":"Password"}</label><Input id="password" type="password" minLength={12} maxLength={128} required autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)}/><small>{lang==="ru"?"Минимум 12 символов.":"At least 12 characters."}</small></>}
       <label className="risk-check"><Checkbox checked={accepted} onCheckedChange={value=>setAccepted(value===true)}/><span>{lang==="ru"?"Я понимаю, что буст может нарушать правила Steam и FACEIT и привести к ограничениям аккаунта.":"I understand that boosting may violate Steam and FACEIT rules and lead to account restrictions."}</span></label>
       <p className="credential-note">{lang==="ru"?"Не указывайте пароль Steam и код Steam Guard в этой форме или чате.":"Do not enter your Steam password or Steam Guard code here or in the chat."}</p>
-      {error&&<p className="error" role="alert">{error}</p>}<Button type="submit" className="account-cta" disabled={loading||!draft}>{loading?(lang==="ru"?"Отправляем…":"Submitting…"):(lang==="ru"?"Отправить заявку":"Submit request")}<ArrowRight size={18}/></Button>{!user&&<p className="account-footnote">{lang==="ru"?"Уже есть аккаунт?":"Already have an account?"} <a href="/login">{lang==="ru"?"Войти":"Sign in"}</a></p>}</form></div></AccountShell>;
+      {user?.role==="admin"&&<p className="summary-note">{lang==="ru"?"Для оформления заказа войдите как клиент.":"Use a client account to place an order."}</p>}{error&&<p className="error" role="alert">{error}</p>}<Button type="submit" className="account-cta" disabled={loading||!ready||!draft||user?.role==="admin"}>{loading?(lang==="ru"?"Отправляем…":"Submitting…"):(lang==="ru"?"Отправить заявку":"Submit request")}<ArrowRight size={18}/></Button>{!user&&<p className="account-footnote">{lang==="ru"?"Уже есть аккаунт?":"Already have an account?"} <a href="/login">{lang==="ru"?"Войти":"Sign in"}</a></p>}</form></div></AccountShell>;
 }

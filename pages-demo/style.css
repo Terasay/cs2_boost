@@ -2,3 +2,23 @@
 
 html{scroll-padding-top:24px;scrollbar-color:#53627a #0a101b}body{overscroll-behavior-y:none}::-webkit-scrollbar{width:10px}::-webkit-scrollbar-track{background:#0a101b}::-webkit-scrollbar-thumb{background:#42536b;border:2px solid #0a101b;border-radius:20px}::-webkit-scrollbar-thumb:hover{background:#f9a64a}.scroll-reveal{opacity:0;transform:translateY(24px);transition:opacity .65s ease,transform .65s cubic-bezier(.2,.7,.2,1);animation:none!important}.scroll-reveal.is-visible{opacity:1;transform:translateY(0)}.service-grid article.scroll-reveal:nth-child(2),.step-grid>div.scroll-reveal:nth-child(2){transition-delay:.08s}.service-grid article.scroll-reveal:nth-child(3),.step-grid>div.scroll-reveal:nth-child(3){transition-delay:.16s}.faq-item{border-bottom:1px solid #334156}.faq-question{display:flex;align-items:center;justify-content:space-between;gap:15px;width:100%;padding:20px 0;background:none;border:0;color:#edf2f8;text-align:left;font-size:18px;font-weight:800;transition:color .2s}.faq-question:hover,.faq-question:focus-visible{color:#f9a64a}.faq-question:focus-visible{outline:2px solid #f9a64a;outline-offset:4px}.faq-question span{color:#f9a64a;font-size:25px;font-weight:400;line-height:18px;transition:transform .32s cubic-bezier(.2,.7,.2,1)}.faq-item.open .faq-question span{transform:rotate(45deg)}.faq-answer{display:grid;grid-template-rows:0fr;opacity:0;transition:grid-template-rows .38s cubic-bezier(.2,.7,.2,1),opacity .28s}.faq-item.open .faq-answer{grid-template-rows:1fr;opacity:1}.faq-answer>div{overflow:hidden}.faq-answer p{font-size:15px;line-height:1.6;color:#9eacbe;margin:0;padding:0 25px 18px 0;transform:translateY(-8px);transition:transform .38s}.faq-item.open .faq-answer p{transform:translateY(0)}.hero-image,.login-image{transition:background-size .65s}.hero-image:hover,.login-image:hover{background-size:105%}@media(prefers-reduced-motion:reduce){.scroll-reveal{opacity:1;transform:none}.faq-answer,.faq-question span,.faq-answer p{transition:none}}
 .rating-row,.message,.chat-empty{animation:soft-enter .32s both}@keyframes soft-enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}@media(max-width:900px){.nav{display:flex;visibility:hidden;opacity:0;transform:translateY(-8px);pointer-events:none;transition:opacity .25s,transform .25s,visibility .25s}.nav.open{visibility:visible;opacity:1;transform:translateY(0);pointer-events:auto}}@media(prefers-reduced-motion:reduce){.rating-row,.message,.chat-empty{animation:none}.nav{transition:none}}
+
+.header-inbox{display:flex;align-items:center;gap:7px;background:transparent;border:0;color:#b7c4d3;font-size:13px;font-weight:800;white-space:nowrap}
+.header-inbox:hover{color:#f9a64a}
+.demo-inbox-toolbar{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:22px}
+.demo-inbox-tabs{display:flex;gap:6px;padding:5px;border:1px solid #304056;border-radius:10px;background:#101a28}
+.demo-inbox-tabs button{display:flex;align-items:center;gap:8px;border:0;border-radius:7px;background:none;color:#9eacbe;padding:11px 14px;font-weight:800}
+.demo-inbox-tabs button.active{background:#26384d;color:#fff}
+.demo-inbox-tabs button span{display:grid;place-items:center;min-width:22px;height:22px;border-radius:100px;background:#ffffff1c;font-size:12px}
+.demo-inbox-toolbar input{width:min(330px,100%);height:46px;border:1px solid #3a4c64;border-radius:7px;background:#172537;padding:0 14px;color:#fff;outline:none}
+.demo-inbox-toolbar input:focus{border-color:#f9a64a}
+.demo-inbox-row p{max-width:700px;margin:8px 0 0;color:#9eacbe;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.demo-support-layout{display:grid;grid-template-columns:minmax(0,1fr) 290px;align-items:start;gap:20px}
+.demo-support-side{position:sticky;top:20px}
+.demo-support-side h2{margin:16px 0 8px}
+.demo-support-side p{color:#9eacbe;line-height:1.6;overflow-wrap:anywhere}
+.demo-support-status{display:flex;justify-content:space-between;gap:15px;border-top:1px solid #34445b;margin:18px 0;padding-top:18px;color:#9eacbe;font-size:13px}
+.demo-support-status strong{color:#fff}
+.demo-support-side .quiet-button{margin-top:12px}
+@media(max-width:900px){.demo-support-layout{grid-template-columns:1fr}.demo-support-side{position:static}}
+@media(max-width:700px){.demo-inbox-toolbar{flex-direction:column;align-items:stretch}.demo-inbox-toolbar input{width:100%}.demo-inbox-tabs button{flex:1;justify-content:center;font-size:12px}.header-inbox span{display:none}}

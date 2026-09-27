@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { readStorage, writeStorage } from "@/lib/browser-storage";
 import Image from "next/image";
 import { ArrowRight, Crosshair, Menu, MessageSquare, ShieldCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -51,7 +52,7 @@ export default function Home() {
   const [menu,setMenu]=useState(false);
   const [faqOpen,setFaqOpen]=useState<number|null>(null);
   const t=words[lang];
-  useEffect(()=>{const timer=setTimeout(()=>{const saved=localStorage.getItem("cs2-lang");if(saved==="ru"||saved==="en"){setLang(saved);document.documentElement.lang=saved}},0);return()=>clearTimeout(timer)},[]);
+  useEffect(()=>{const timer=setTimeout(()=>{const saved=readStorage("localStorage","cs2-lang");if(saved==="ru"||saved==="en"){setLang(saved);document.documentElement.lang=saved}},0);return()=>clearTimeout(timer)},[]);
   useEffect(()=>{
     type Context = { registerTool: (tool: { name:string; title:string; description:string; inputSchema:object; annotations:{readOnlyHint:boolean}; execute:(input:unknown)=>Promise<unknown> }, options:{signal:AbortSignal})=>void|Promise<void> };
     const context=(document as Document & {modelContext?:Context}).modelContext;
@@ -64,9 +65,10 @@ export default function Home() {
       inputSchema:{type:"object",properties:{platform:{type:"string",enum:["premier","faceit"]},service:{type:"string",enum:["rating","calibration"]},method:{type:"string",enum:["duo","piloted"]},current:{type:"integer",minimum:0},target:{type:"integer",minimum:1}},required:["platform","service","method"],additionalProperties:false},
       annotations:{readOnlyHint:false},
       async execute(input){
+        if(!input||typeof input!=="object")throw new Error("Invalid request options");
         const value=input as Record<string,unknown>;
         if((value.platform!=="premier"&&value.platform!=="faceit")||(value.service!=="rating"&&value.service!=="calibration")||(value.method!=="duo"&&value.method!=="piloted"))throw new Error("Invalid request options");
-        if(value.service==="rating"&&(!Number.isInteger(value.current)||!Number.isInteger(value.target)||Number(value.current)<0||Number(value.target)<=Number(value.current)))throw new Error("Valid current and target ratings are required");
+        if(value.service==="rating"&&(!Number.isInteger(value.current)||!Number.isInteger(value.target)||Number(value.current)<0||Number(value.target)<=Number(value.current)||Number(value.target)>100000))throw new Error("Valid current and target ratings are required");
         setPlatform(value.platform);setService(value.service);setMethod(value.method);
         setCurrent(value.service==="rating"?String(value.current):"");setTarget(value.service==="rating"?String(value.target):"");setError("");
         document.getElementById("calculator")?.scrollIntoView({behavior:"smooth",block:"start"});
@@ -82,12 +84,12 @@ export default function Home() {
     elements.forEach(element=>{element.classList.add("scroll-reveal");observer.observe(element)});
     return()=>observer.disconnect();
   },[]);
-  function setLanguage(value:Lang){setLang(value);localStorage.setItem("cs2-lang",value);document.documentElement.lang=value}
+  function setLanguage(value:Lang){setLang(value);writeStorage("localStorage","cs2-lang",value);document.documentElement.lang=value}
   function next(){
     const start=Number(current),end=Number(target);
-    if(service==="rating"&&(!current||!target||!Number.isFinite(start)||!Number.isFinite(end)||start<0||end<=start)){setError(t.invalid);return}
+    if(service==="rating"&&(!current||!target||!Number.isInteger(start)||!Number.isInteger(end)||start<0||end<=start||end>100000)){setError(t.invalid);return}
     setError("");
-    sessionStorage.setItem("cs2-draft",JSON.stringify({platform,service,method,current:service==="rating"?start:null,target:service==="rating"?end:null}));
+    if(!writeStorage("sessionStorage","cs2-draft",JSON.stringify({platform,service,method,current:service==="rating"?start:null,target:service==="rating"?end:null}))){setError(lang==="ru"?"Разрешите хранение данных в браузере, чтобы продолжить оформление.":"Allow browser storage to continue your request.");return}
     window.location.assign("/register");
   }
   return <div className="site">

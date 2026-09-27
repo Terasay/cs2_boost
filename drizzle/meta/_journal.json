@@ -15,6 +15,20 @@
       "when": 1790500016148,
       "tag": "0001_fast_justice",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790524074242,
+      "tag": "0002_opposite_justin_hammer",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1790525481278,
+      "tag": "0003_ambiguous_secret_warriors",
+      "breakpoints": true
     }
   ]
 }

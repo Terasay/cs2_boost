@@ -19,13 +19,16 @@ export async function jsonInput(request: Request, maxBytes = 8192): Promise<Reco
   if (!reader) return null;
   const chunks: Uint8Array[] = [];
   let length = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    length += value.byteLength;
-    if (length > maxBytes) { await reader.cancel(); return null; }
-    chunks.push(value);
-  }
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.byteLength;
+      if (length > maxBytes) { await reader.cancel(); return null; }
+      chunks.push(value);
+    }
+  } catch { return null; }
+  finally { reader.releaseLock(); }
   const bytes = new Uint8Array(length);
   let offset = 0;
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
@@ -38,5 +41,19 @@ export async function jsonInput(request: Request, maxBytes = 8192): Promise<Reco
 }
 
 export function privateJson(data: unknown, status = 200, headers?: HeadersInit) {
-  return Response.json(data, { status, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...headers } });
+  const responseHeaders = new Headers(headers);
+  responseHeaders.set("Cache-Control", "no-store");
+  responseHeaders.set("X-Content-Type-Options", "nosniff");
+  return Response.json(data, { status, headers: responseHeaders });
+}
+
+export function safeApi(handler: (request: Request) => Promise<Response>) {
+  return async (request: Request) => {
+    try { return await handler(request); }
+    catch {
+      const requestId = crypto.randomUUID();
+      console.error("API request failed", { requestId, path: new URL(request.url).pathname });
+      return privateJson({ error: "Service temporarily unavailable. Try again later", requestId }, 503);
+    }
+  };
 }
