@@ -9,12 +9,19 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    "dist/**",
+    "docs/**",
+    ".npm-cache/**",
+    ".wrangler/**",
+    ".sites-runtime/**",
+    "outputs/**",
     "next-env.d.ts",
   ]),
   {
     files: ["app/**/*.{ts,tsx}"],
     rules: {
       "@next/next/no-html-link-for-pages": "off",
+      "@next/next/no-location-assign-relative-destination": "off",
     },
   },
   {

@@ -1,9 +1,9 @@
-import { execFileSync } from "node:child_process";
+import { DatabaseSync } from "node:sqlite";
 import { createHash } from "node:crypto";
-import { writeFileSync } from "node:fs";
+import { writeFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 
-const base = process.env.SITE_TEST_URL ?? "http://localhost:5173";
+const base = process.env.SITE_TEST_URL ?? "http://127.0.0.1:8787";
 const origin = new URL(base).origin;
 const nonce = crypto.randomUUID().slice(0, 8);
 const password = "LocalSmokeTestPassword_2026";
@@ -13,11 +13,15 @@ const clientEmail = `client-${nonce}@example.test`;
 const strangerEmail = `stranger-${nonce}@example.test`;
 const local = new URL(base).hostname === "localhost" || new URL(base).hostname === "127.0.0.1";
 if (!local) throw new Error("This smoke test changes the local D1 database and only runs on localhost");
+const dbDirectory = ".wrangler/state/v3/d1/miniflare-D1DatabaseObject";
+const dbFiles = readdirSync(dbDirectory).filter(name => /^[0-9a-f]{64}\.sqlite$/.test(name));
+if(dbFiles.length !== 1)throw new Error("Expected one local D1 database for this test");
 function sql(command) {
-  const file = `.wrangler/smoke-${nonce}.sql`;
-  writeFileSync(file, command);
-  execFileSync(process.execPath, ["--import", "./scripts/sites-env.mjs", "node_modules/wrangler/bin/wrangler.js", "d1", "execute", "DB", "--local", "--config", "dist/server/wrangler.json", "--persist-to", ".wrangler/state", "--file", file, "--yes"], { stdio: "ignore" });
+  const database = new DatabaseSync(`${dbDirectory}/${dbFiles[0]}`);
+  try { database.exec("PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;"); database.exec(command); }
+  finally { database.close(); }
 }
+
 const keys = ["local", "127.0.0.1", "::1"].flatMap(ip => ["register", "login-ip"].map(scope => createHash("sha256").update(`${scope}:${ip}:`).digest("hex")));
 sql(`DELETE FROM auth_attempts WHERE key IN (${keys.map(key=>"'"+key+"'").join(",")})`);
 const fixtureIds=[];
@@ -26,7 +30,7 @@ try {
 async function call(path, { method = "GET", body, cookie = "", headers = {}, expected = 200 } = {}) {
   const response = await fetch(base + path, {
     method,
-    headers: { ...(body ? { "Content-Type": "application/json" } : {}), ...(method !== "GET" ? { Origin: origin } : {}), ...(cookie ? { Cookie: cookie } : {}), ...headers },
+    headers: { Connection: "close", ...(body ? { "Content-Type": "application/json" } : {}), ...(method !== "GET" ? { Origin: origin } : {}), ...(cookie ? { Cookie: cookie } : {}), ...headers },
     body: body ? JSON.stringify(body) : undefined,
   });
   const raw = await response.text();
@@ -82,6 +86,7 @@ await call("/api/support", { method: "POST", cookie: clientCookie, body: { body:
 const reopened = await call(`/api/support/${supportId}`, { cookie: adminCookie });
 if (reopened.result.thread.status !== "open" || reopened.result.messages.length !== 3) throw new Error("Support conversation did not reopen");
 
+await call(`/api/orders/${id}`, { method: "PATCH", cookie: adminCookie, body: { status: "awaiting_payment", quotedPrice: 6000, deadline: "2026-10-10", updatedAt: final.result.order.updatedAt }, expected: 409 });
 for (const current of [null, true, {}, "4000", 1.5]) await call("/api/orders", { method: "POST", cookie: clientCookie, body: { platform: "premier", service: "rating", method: "duo", current, target: 5000, riskAccepted: true }, expected: 400 });
 await call(`/api/orders/${id}`, { method: "PATCH", cookie: adminCookie, body: { status: "quoted", quotedPrice: true, deadline: "2026-10-10", updatedAt: final.result.order.updatedAt }, expected: 400 });
 await call(`/api/orders/${id}`, { method: "PATCH", cookie: adminCookie, body: { status: "quoted", quotedPrice: 6000, deadline: "2026-02-30", updatedAt: final.result.order.updatedAt }, expected: 400 });
@@ -122,12 +127,17 @@ if (gone.result.user !== null) throw new Error("Logout-all did not revoke sessio
 for (let attempt = 0; attempt < 10; attempt++) await call("/api/auth/login", { method: "POST", body: { email: `missing-${nonce}@example.test`, password }, expected: 401 });
 await call("/api/auth/login", { method: "POST", body: { email: `missing-${nonce}@example.test`, password }, expected: 429 });
 
+const burst=await Promise.all(Array.from({length:12},()=>fetch(base+"/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json",Origin:origin,Connection:"close"},body:JSON.stringify({email:`parallel-${nonce}@example.test`,password})}).then(async response=>{await response.text();return response.status})));
+assert.equal(burst.filter(status=>status===401).length,10);
+assert.equal(burst.filter(status=>status===429).length,2);
+const noOrigin=await fetch(base+"/api/orders",{method:"POST",headers:{"Content-Type":"application/json",Cookie:adminCookie,Connection:"close"},body:"{}"});
+assert.equal(noOrigin.status,403);await noOrigin.text();
 const checks = await fetch(base+"/");
 assert.equal(checks.headers.get("x-frame-options"),"DENY");
 assert.match(checks.headers.get("content-security-policy")??"",/frame-ancestors 'none'/);
 assert.equal(checks.headers.get("x-content-type-options"),"nosniff");
 if(process.env.SITE_KEEP_FIXTURES === "1")writeFileSync(".wrangler/ui-audit-fixture.json",JSON.stringify({adminEmail,clientEmail,password,newPassword,id,supportId}));
-console.log(JSON.stringify({ ok: true, securityHeaders:true, historyPagination:true, strictValidation:true, staleSessions:true, staleQuotes:true, orderId: id, supportId, clientRole: client.result.user.role, adminRole: promoted.result.user.role, status: final.result.order.status, messages: final.result.messages.length, supportMessages: reopened.result.messages.length, passwordChange: true, logoutAll: true, loginThrottle: true }));
+console.log(JSON.stringify({ ok: true, securityHeaders:true, concurrentThrottle:true, historyPagination:true, strictValidation:true, staleSessions:true, staleQuotes:true, orderId: id, supportId, clientRole: client.result.user.role, adminRole: promoted.result.user.role, status: final.result.order.status, messages: final.result.messages.length, supportMessages: reopened.result.messages.length, passwordChange: true, logoutAll: true, loginThrottle: true }));
 
 } finally {
   if(fixtureIds.length){

@@ -12,9 +12,11 @@
     "dev:pages": "vite --config pages-demo/vite.config.ts --host 127.0.0.1 --port 4173",
     "build:pages": "vite build --config pages-demo/vite.config.ts",
     "preview:pages": "vite preview --config pages-demo/vite.config.ts --host 127.0.0.1 --port 4173",
-    "start": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
+    "start": "node --import ./scripts/sites-env.mjs scripts/preview-local.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "test:security": "node --test scripts/security.test.mjs",
+    "test:smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -61,7 +63,8 @@
     "typescript": "5.9.3",
     "vinext": "1.0.0-beta.13",
     "vite": "8.0.16",
-    "wrangler": "4.142.0"
+    "wrangler": "4.142.0",
+    "miniflare": "5.20260926.0-alpha"
   },
   "type": "module",
   "overrides": {

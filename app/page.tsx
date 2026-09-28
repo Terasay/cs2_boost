@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { readStorage, writeStorage } from "@/lib/browser-storage";
+import { api } from "./account-ui";
 import Image from "next/image";
 import { ArrowRight, Crosshair, Menu, MessageSquare, ShieldCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,9 @@ export default function Home() {
   const [target,setTarget]=useState("");
   const [error,setError]=useState("");
   const [menu,setMenu]=useState(false);
+  const [signedIn,setSignedIn]=useState(false);
+  useEffect(()=>{let active=true;void api<{user:unknown}>("/api/auth/me").then(result=>{if(active)setSignedIn(Boolean(result.user))}).catch(()=>{});return()=>{active=false}},[]);
+  useEffect(()=>{function escape(event:KeyboardEvent){if(event.key==="Escape")setMenu(false)}document.addEventListener("keydown",escape);return()=>document.removeEventListener("keydown",escape)},[]);
   const [faqOpen,setFaqOpen]=useState<number|null>(null);
   const t=words[lang];
   useEffect(()=>{const timer=setTimeout(()=>{const saved=readStorage("localStorage","cs2-lang");if(saved==="ru"||saved==="en"){setLang(saved);document.documentElement.lang=saved}},0);return()=>clearTimeout(timer)},[]);
@@ -71,7 +75,7 @@ export default function Home() {
         if(value.service==="rating"&&(!Number.isInteger(value.current)||!Number.isInteger(value.target)||Number(value.current)<0||Number(value.target)<=Number(value.current)||Number(value.target)>100000))throw new Error("Valid current and target ratings are required");
         setPlatform(value.platform);setService(value.service);setMethod(value.method);
         setCurrent(value.service==="rating"?String(value.current):"");setTarget(value.service==="rating"?String(value.target):"");setError("");
-        document.getElementById("calculator")?.scrollIntoView({behavior:"smooth",block:"start"});
+        document.getElementById("calculator")?.scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"instant":"smooth",block:"start"});
         return {staged:true,platform:value.platform,service:value.service,method:value.method,current:value.service==="rating"?value.current:null,target:value.service==="rating"?value.target:null};
       }
     },{signal:lifecycle.signal})).catch(()=>{});
@@ -97,7 +101,7 @@ export default function Home() {
     <header className="header wrap">
       <a href="/" className="brand"><span className="brand-mark"><Crosshair size={22}/></span>CS2<span>BOOST</span></a>
       <nav className={menu?"nav open":"nav"}><a href="#services" onClick={()=>setMenu(false)}>{t.services}</a><a href="#process" onClick={()=>setMenu(false)}>{t.process}</a><a href="#faq" onClick={()=>setMenu(false)}>{t.faq}</a></nav>
-      <div className="header-actions"><div className="language"><button className={lang==="ru"?"active":""} onClick={()=>setLanguage("ru")}>RU</button><span>/</span><button className={lang==="en"?"active":""} onClick={()=>setLanguage("en")}>EN</button></div><a href="/login" className="login-link">{t.login} <ArrowRight size={16}/></a><button className="menu-button" aria-label={menu?"Close menu":"Open menu"} aria-expanded={menu} onClick={()=>setMenu(!menu)}>{menu?<X/>:<Menu/>}</button></div>
+      <div className="header-actions"><div className="language"><button className={lang==="ru"?"active":""} onClick={()=>setLanguage("ru")}>RU</button><span>/</span><button className={lang==="en"?"active":""} onClick={()=>setLanguage("en")}>EN</button></div><a href={signedIn?"/dashboard":"/login"} className="login-link" aria-label={signedIn?(lang==="ru"?"Личный кабинет":"Account"):t.login}>{signedIn?(lang==="ru"?"Кабинет":"Account"):t.login} <ArrowRight size={16}/></a><button className="menu-button" aria-label={menu?(lang==="ru"?"Закрыть меню":"Close menu"):(lang==="ru"?"Открыть меню":"Open menu")} aria-expanded={menu} onClick={()=>setMenu(!menu)}>{menu?<X/>:<Menu/>}</button></div>
     </header>
     <main>
       <section className="hero wrap">
@@ -111,7 +115,7 @@ export default function Home() {
             {service==="rating"?<div className="rating-row"><div className="field"><label htmlFor="current">{t.current}</label><Input id="current" type="number" min="0" inputMode="numeric" value={current} onChange={event=>setCurrent(event.target.value)} placeholder="4 500" className="rating-control"/></div><div className="field"><label htmlFor="target">{t.target}</label><Input id="target" type="number" min="1" inputMode="numeric" value={target} onChange={event=>setTarget(event.target.value)} placeholder="10 000" className="rating-control"/></div></div>:<p className="calibration-hint">{t.calibrationHint}</p>}
             <div className="estimate"><div><span>{t.quote}</span><strong>{t.quoteValue}</strong></div><p>{t.quoteHint}</p></div>
             {error&&<p className="error" role="alert">{error}</p>}
-            <Button className="continue-button" onClick={next}>{t.continue}<ArrowRight size={19}/></Button><p className="under-button">{t.accountLater}</p>
+            <Button className="continue-button" onClick={next}>{t.continue}<ArrowRight size={19}/></Button><p className="under-button">{signedIn?(lang==="ru"?"Заявка сохранится в личном кабинете":"Your request will be saved in your account"):t.accountLater}</p>
           </div>
         </div>
       </section>

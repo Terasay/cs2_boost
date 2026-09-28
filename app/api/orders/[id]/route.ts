@@ -52,6 +52,7 @@ async function PATCHHandler(request: Request) {
   if (input.deadline && !validDate(input.deadline)) return fail("Invalid deadline");
   const deadline = validDate(input.deadline) ? input.deadline : null;
   if (status === "quoted" && (price === null || !deadline)) return fail("Price and deadline are required for a quote");
+  if (!["new", "quoted"].includes(order.status) && status !== "quoted" && (price !== order.quotedPrice || deadline !== order.deadline)) return fail("Send a new quote to change accepted terms", 409);
   const updated = await db.update(orders).set({ status: status as typeof statuses[number], quotedPrice: price, quotedCurrency: price === null ? null : "KZT", deadline, updatedAt }).where(and(eq(orders.id, id), eq(orders.updatedAt, input.updatedAt))).returning({ id: orders.id });
   if (!updated.length) return fail("Order changed. Refresh and review the latest terms", 409);
   return privateJson({ ok: true });

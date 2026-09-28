@@ -46,6 +46,7 @@ const errorMessages: Record<string, string> = {
   "Conversation not found": "Переписка не найдена или недоступна этому аккаунту.",
   "Order changed. Refresh and review the latest terms": "Условия заказа изменились. Обновите их и проверьте перед подтверждением.",
   "Order cannot be accepted": "Предложение уже изменено или принято. Обновите страницу.",
+  "Send a new quote to change accepted terms": "Для изменения согласованной цены или срока выберите статус «Предложение готово». Клиент должен подтвердить новые условия.",
   "Price and deadline are required for a quote": "Для предложения укажите цену и дату завершения.",
   "Invalid price": "Укажите целую сумму от 0 до 100 000 000 ₸.",
   "Invalid deadline": "Укажите существующую дату завершения.",
