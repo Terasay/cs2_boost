@@ -22,8 +22,10 @@ async function POSTHandler(request: Request) {
   const retry = await chargeAttempt(await rateKey("support-message", null, user.id), 30, 5 * 60_000);
   if (retry) return privateJson({ error: "Too many messages. Try again later" }, 429, { "Retry-After": String(retry) });
   const now = Date.now();
-  await db.batch([db.insert(supportMessages).values({ id: crypto.randomUUID(), threadId: id, senderId: user.id, body, createdAt: now }),
-  db.update(supportThreads).set({ status: "open", updatedAt: now }).where(eq(supportThreads.id, id))]);
+  db.transaction(tx => {
+    tx.insert(supportMessages).values({ id: crypto.randomUUID(), threadId: id, senderId: user.id, body, createdAt: now }).run();
+    tx.update(supportThreads).set({ status: "open", updatedAt: now }).where(eq(supportThreads.id, id)).run();
+  });
   return privateJson({ ok: true }, 201);
 }
 

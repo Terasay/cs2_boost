@@ -1,5 +1,7 @@
+import { publicOrigin } from "../../lib/server-config.mjs";
+
 export function sameOriginMutation(request: Request) {
-  const expected = new URL(request.url).origin;
+  const expected = publicOrigin(request);
   const fetchSite = request.headers.get("sec-fetch-site");
   if (fetchSite && fetchSite !== "same-origin" && fetchSite !== "none") return false;
   const origin = request.headers.get("origin");

@@ -1,11 +1,12 @@
 import { eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { authAttempts } from "@/db/schema";
+import { clientIp } from "@/lib/server-config.mjs";
 
 let lastCleanup = 0;
 
 export async function rateKey(scope: string, request: Request | null, value = "") {
-  const ip = request ? request.headers.get("cf-connecting-ip") ?? "local" : "account";
+  const ip = request ? clientIp(request) : "account";
   const result = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${scope}:${ip}:${value.toLowerCase()}`));
   return Array.from(new Uint8Array(result), byte => byte.toString(16).padStart(2, "0")).join("");
 }

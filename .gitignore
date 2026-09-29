@@ -36,3 +36,8 @@ next-env.d.ts
 /.codex/
 /outputs/
 /work/
+/data/
+/backups/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

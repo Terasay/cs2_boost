@@ -1,0 +1,30 @@
+[Unit]
+Description=CS2 Boost
+After=network.target
+
+[Service]
+Type=simple
+User=cs2boost
+Group=cs2boost
+WorkingDirectory=/opt/cs2-boost
+EnvironmentFile=/etc/cs2-boost.env
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+Environment=NODE_OPTIONS=--max-old-space-size=384
+ExecStartPre=/opt/node24/bin/node scripts/check-config.mjs
+ExecStart=/opt/node24/bin/node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3000
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/cs2-boost /opt/cs2-boost/.next/cache
+MemoryHigh=512M
+MemoryMax=700M
+TasksMax=128
+
+[Install]
+WantedBy=multi-user.target

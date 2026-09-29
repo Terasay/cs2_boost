@@ -4,6 +4,35 @@ import { test } from "node:test";
 import { hashPassword, verifyPassword } from "../lib/password.ts";
 import { ratingValue, validDate } from "../lib/order-validation.ts";
 import { jsonInput, sameOriginMutation, safeApi } from "../app/api/request-security.ts";
+import { publicOrigin, clientIp } from "../lib/server-config.mjs";
+
+test("public origin and client IP behind the trusted reverse proxy", () => {
+  const saved = { ...process.env };
+  try {
+    process.env.NODE_ENV = "production";
+    process.env.APP_ORIGIN = "https://boost.example";
+    process.env.TRUST_PROXY = "1";
+    const request = new Request("http://127.0.0.1:3000/api/orders", { headers: { origin: "https://boost.example", "x-real-ip": "192.0.2.1", "cf-connecting-ip": "198.51.100.4", "x-forwarded-host": "evil.test" } });
+    assert.equal(publicOrigin(request), "https://boost.example");
+    assert.equal(sameOriginMutation(request), true);
+    assert.equal(clientIp(request), "192.0.2.1");
+    assert.equal(sameOriginMutation(new Request(request, { headers: { origin: "http://127.0.0.1:3000" } })), false);
+    assert.throws(() => clientIp(new Request("http://localhost")));
+    process.env.TRUST_PROXY = "0";
+    assert.equal(clientIp(request), "local");
+    delete process.env.APP_ORIGIN;
+    assert.throws(() => publicOrigin(request));
+    process.env.APP_ORIGIN = "http://192.0.2.1";
+    delete process.env.ALLOW_HTTP_TESTING;
+    assert.throws(() => publicOrigin(request));
+    process.env.ALLOW_HTTP_TESTING = "1";
+    assert.equal(publicOrigin(request), "http://192.0.2.1");
+  } finally {
+    for (const key of ["NODE_ENV", "APP_ORIGIN", "TRUST_PROXY", "ALLOW_HTTP_TESTING"]) {
+      if (saved[key] === undefined) delete process.env[key]; else process.env[key] = saved[key];
+    }
+  }
+});
 
 test("password hashes support existing accounts and Workers fallback", async () => {
   const password = "Test password only 12345";

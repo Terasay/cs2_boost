@@ -1,6 +1,7 @@
 import { and, eq, gt, lt, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { sessions, users } from "@/db/schema";
+import { publicOrigin } from "@/lib/server-config.mjs";
 export { hashPassword, needsPasswordUpgrade, verifyPassword } from "@/lib/password";
 
 const SESSION_SECONDS = 60 * 60 * 24 * 7;
@@ -12,17 +13,17 @@ export async function createSession(userId: string, version: number, request: Re
   const db = getDb();
   await db.delete(sessions).where(lt(sessions.expiresAt, Date.now()));
   await db.insert(sessions).values({ id: await digest(token), userId, version, expiresAt: Date.now() + SESSION_SECONDS * 1000 });
-  const secure = new URL(request.url).protocol === "https:";
+  const secure = publicOrigin(request).startsWith("https:");
   return `${secure ? "__Host-cs2_session" : "cs2_session"}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_SECONDS}${secure ? "; Secure" : ""}`;
 }
 
 export function clearSessionCookie(request: Request) {
-  const secure = new URL(request.url).protocol === "https:";
+  const secure = publicOrigin(request).startsWith("https:");
   return `${secure ? "__Host-cs2_session" : "cs2_session"}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${secure ? "; Secure" : ""}`;
 }
 
 function sessionToken(request: Request) {
-  const name = new URL(request.url).protocol === "https:" ? "__Host-cs2_session" : "cs2_session";
+  const name = publicOrigin(request).startsWith("https:") ? "__Host-cs2_session" : "cs2_session";
   return request.headers.get("cookie")?.match(new RegExp(`(?:^|;\\s*)${name}=([0-9a-f]{64})(?:;|$)`))?.[1];
 }
 
@@ -42,8 +43,8 @@ export async function deleteSession(request: Request) {
 
 export async function deleteAllSessions(userId: string) {
   const db = getDb();
-  await db.batch([
-    db.update(users).set({ sessionVersion: sql`${users.sessionVersion} + 1` }).where(eq(users.id, userId)),
-    db.delete(sessions).where(eq(sessions.userId, userId)),
-  ]);
+  db.transaction(tx => {
+    tx.update(users).set({ sessionVersion: sql`${users.sessionVersion} + 1` }).where(eq(users.id, userId)).run();
+    tx.delete(sessions).where(eq(sessions.userId, userId)).run();
+  });
 }

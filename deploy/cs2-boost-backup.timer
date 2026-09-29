@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily CS2 Boost database backup
+
+[Timer]
+OnCalendar=*-*-* 04:15:00
+RandomizedDelaySec=900
+Persistent=true
+
+[Install]
+WantedBy=timers.target

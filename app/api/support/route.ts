@@ -36,8 +36,10 @@ async function POSTHandler(request: Request) {
   await db.insert(supportThreads).values({ id: crypto.randomUUID(), userId: user.id, status: "open", createdAt: now, updatedAt: now }).onConflictDoNothing();
   const [thread] = await db.select({ id: supportThreads.id }).from(supportThreads).where(eq(supportThreads.userId, user.id)).limit(1);
   if (!thread) return fail("Support unavailable", 503);
-  await db.batch([db.insert(supportMessages).values({ id: crypto.randomUUID(), threadId: thread.id, senderId: user.id, body, createdAt: now }),
-  db.update(supportThreads).set({ status: "open", updatedAt: now }).where(eq(supportThreads.id, thread.id))]);
+  db.transaction(tx => {
+    tx.insert(supportMessages).values({ id: crypto.randomUUID(), threadId: thread.id, senderId: user.id, body, createdAt: now }).run();
+    tx.update(supportThreads).set({ status: "open", updatedAt: now }).where(eq(supportThreads.id, thread.id)).run();
+  });
   return privateJson({ id: thread.id }, 201);
 }
 

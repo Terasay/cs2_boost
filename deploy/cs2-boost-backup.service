@@ -1,0 +1,17 @@
+[Unit]
+Description=CS2 Boost database backup
+
+[Service]
+Type=oneshot
+User=cs2boost
+Group=cs2boost
+WorkingDirectory=/opt/cs2-boost
+EnvironmentFile=/etc/cs2-boost.env
+Environment=NODE_ENV=production
+ExecStart=/opt/node24/bin/node scripts/backup.mjs
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/cs2-boost /var/backups/cs2-boost

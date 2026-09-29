@@ -1,10 +1,11 @@
 import { DatabaseSync } from "node:sqlite";
 import { createHash } from "node:crypto";
-import { writeFileSync, readdirSync } from "node:fs";
+import { writeFileSync, mkdirSync } from "node:fs";
 import assert from "node:assert/strict";
+import { databasePath } from "../db/connection.mjs";
 
-const base = process.env.SITE_TEST_URL ?? "http://127.0.0.1:8787";
-const origin = new URL(base).origin;
+const base = process.env.SITE_TEST_URL ?? "http://127.0.0.1:3000";
+const origin = process.env.SITE_TEST_ORIGIN || new URL(base).origin;
 const nonce = crypto.randomUUID().slice(0, 8);
 const password = "LocalSmokeTestPassword_2026";
 const newPassword = "LocalSmokeTestNewPassword_2026";
@@ -12,12 +13,11 @@ const adminEmail = `admin-${nonce}@example.test`;
 const clientEmail = `client-${nonce}@example.test`;
 const strangerEmail = `stranger-${nonce}@example.test`;
 const local = new URL(base).hostname === "localhost" || new URL(base).hostname === "127.0.0.1";
-if (!local) throw new Error("This smoke test changes the local D1 database and only runs on localhost");
-const dbDirectory = ".wrangler/state/v3/d1/miniflare-D1DatabaseObject";
-const dbFiles = readdirSync(dbDirectory).filter(name => /^[0-9a-f]{64}\.sqlite$/.test(name));
-if(dbFiles.length !== 1)throw new Error("Expected one local D1 database for this test");
+if (!local) throw new Error("This smoke test changes the database and only runs on localhost");
+const dbFile = databasePath();
+mkdirSync("work", { recursive: true });
 function sql(command) {
-  const database = new DatabaseSync(`${dbDirectory}/${dbFiles[0]}`);
+  const database = new DatabaseSync(dbFile);
   try { database.exec("PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;"); database.exec(command); }
   finally { database.close(); }
 }
@@ -30,9 +30,12 @@ try {
 async function call(path, { method = "GET", body, cookie = "", headers = {}, expected = 200 } = {}) {
   const response = await fetch(base + path, {
     method,
-    headers: { Connection: "close", ...(body ? { "Content-Type": "application/json" } : {}), ...(method !== "GET" ? { Origin: origin } : {}), ...(cookie ? { Cookie: cookie } : {}), ...headers },
+    headers: { "X-Real-IP": "127.0.0.1", Connection: "close", ...(body ? { "Content-Type": "application/json" } : {}), ...(method !== "GET" ? { Origin: origin } : {}), ...(cookie ? { Cookie: cookie } : {}), ...headers },
     body: body ? JSON.stringify(body) : undefined,
   });
+  if (path === "/api/auth/register" && response.status === 200 && origin.startsWith("https:")) {
+    assert.match(response.headers.get("set-cookie") ?? "", /^__Host-cs2_session=.+; HttpOnly; SameSite=Lax; Path=\/; Max-Age=\d+; Secure$/);
+  }
   const raw = await response.text();
   let result;
   try { result = JSON.parse(raw); } catch { result = { error: raw }; }
@@ -115,7 +118,7 @@ if (expired.result.user !== null) throw new Error("Old session survived password
 const staleToken="ab".repeat(32);
 const staleHash=createHash("sha256").update(staleToken).digest("hex");
 sql(`INSERT INTO sessions (id,user_id,expires_at,version) VALUES ('${staleHash}','${client.result.user.id}',${Date.now()+60000},0)`);
-const raced=await call("/api/auth/me",{cookie:`cs2_session=${staleToken}`});
+const raced=await call("/api/auth/me",{cookie:`${origin.startsWith("https:") ? "__Host-cs2_session" : "cs2_session"}=${staleToken}`});
 assert.equal(raced.result.user,null,"Session issued concurrently with password change survived revocation");
 clientCookie = changed.cookie;
 await call("/api/auth/login", { method: "POST", body: { email: clientEmail, password }, expected: 401 });
@@ -127,16 +130,16 @@ if (gone.result.user !== null) throw new Error("Logout-all did not revoke sessio
 for (let attempt = 0; attempt < 10; attempt++) await call("/api/auth/login", { method: "POST", body: { email: `missing-${nonce}@example.test`, password }, expected: 401 });
 await call("/api/auth/login", { method: "POST", body: { email: `missing-${nonce}@example.test`, password }, expected: 429 });
 
-const burst=await Promise.all(Array.from({length:12},()=>fetch(base+"/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json",Origin:origin,Connection:"close"},body:JSON.stringify({email:`parallel-${nonce}@example.test`,password})}).then(async response=>{await response.text();return response.status})));
+const burst=await Promise.all(Array.from({length:12},()=>fetch(base+"/api/auth/login",{method:"POST",headers:{"X-Real-IP":"127.0.0.1","Content-Type":"application/json",Origin:origin,Connection:"close"},body:JSON.stringify({email:`parallel-${nonce}@example.test`,password})}).then(async response=>{await response.text();return response.status})));
 assert.equal(burst.filter(status=>status===401).length,10);
 assert.equal(burst.filter(status=>status===429).length,2);
-const noOrigin=await fetch(base+"/api/orders",{method:"POST",headers:{"Content-Type":"application/json",Cookie:adminCookie,Connection:"close"},body:"{}"});
+const noOrigin=await fetch(base+"/api/orders",{method:"POST",headers:{"X-Real-IP":"127.0.0.1","Content-Type":"application/json",Cookie:adminCookie,Connection:"close"},body:"{}"});
 assert.equal(noOrigin.status,403);await noOrigin.text();
 const checks = await fetch(base+"/");
 assert.equal(checks.headers.get("x-frame-options"),"DENY");
 assert.match(checks.headers.get("content-security-policy")??"",/frame-ancestors 'none'/);
 assert.equal(checks.headers.get("x-content-type-options"),"nosniff");
-if(process.env.SITE_KEEP_FIXTURES === "1")writeFileSync(".wrangler/ui-audit-fixture.json",JSON.stringify({adminEmail,clientEmail,password,newPassword,id,supportId}));
+if(process.env.SITE_KEEP_FIXTURES === "1")writeFileSync("work/ui-audit-fixture.json",JSON.stringify({adminEmail,clientEmail,password,newPassword,id,supportId}));
 console.log(JSON.stringify({ ok: true, securityHeaders:true, concurrentThrottle:true, historyPagination:true, strictValidation:true, staleSessions:true, staleQuotes:true, orderId: id, supportId, clientRole: client.result.user.role, adminRole: promoted.result.user.role, status: final.result.order.status, messages: final.result.messages.length, supportMessages: reopened.result.messages.length, passwordChange: true, logoutAll: true, loginThrottle: true }));
 
 } finally {
@@ -144,7 +147,7 @@ console.log(JSON.stringify({ ok: true, securityHeaders:true, concurrentThrottle:
     for(const id of fixtureIds)assert.match(id,/^[0-9a-f-]{36}$/);
     const ids=fixtureIds.map(id=>"'"+id+"'").join(",");
     const cleanup=`DELETE FROM messages WHERE order_id IN (SELECT id FROM orders WHERE user_id IN (${ids})); DELETE FROM support_messages WHERE thread_id IN (SELECT id FROM support_threads WHERE user_id IN (${ids})); DELETE FROM support_threads WHERE user_id IN (${ids}); DELETE FROM orders WHERE user_id IN (${ids}); DELETE FROM sessions WHERE user_id IN (${ids}); DELETE FROM users WHERE id IN (${ids});`;
-    if(process.env.SITE_KEEP_FIXTURES === "1")writeFileSync(".wrangler/ui-audit-cleanup.sql",cleanup);
+    if(process.env.SITE_KEEP_FIXTURES === "1")writeFileSync("work/ui-audit-cleanup.sql",cleanup);
     else sql(cleanup);
   }
 }
