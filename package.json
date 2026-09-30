@@ -20,7 +20,9 @@
     "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate.mjs",
     "db:backup": "node --env-file-if-exists=.env.local scripts/backup.mjs",
     "admin:set": "node --env-file-if-exists=.env.local scripts/set-admin.mjs",
-    "test:deployment": "node --test scripts/deployment.test.mjs"
+    "test:deployment": "node --test scripts/deployment.test.mjs",
+    "test:marketing": "node --test scripts/marketing.test.mjs",
+    "test:seo": "node scripts/seo-smoke.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

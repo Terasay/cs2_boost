@@ -59,8 +59,16 @@ sql(`UPDATE users SET role = 'admin' WHERE id = '${admin.result.user.id}'`);
 const promoted = await call("/api/auth/me", { cookie: adminCookie });
 if (promoted.result.user.role !== "admin") throw new Error("Admin role was not applied");
 
-const created = await call("/api/orders", { method: "POST", cookie: clientCookie, body: { platform: "premier", service: "rating", method: "duo", current: 4000, target: 5000, riskAccepted: true }, expected: 201 });
+const created = await call("/api/orders", { method: "POST", cookie: clientCookie, body: { platform: "premier", service: "rating", method: "duo", current: 4000, target: 5000, riskAccepted: true, attribution: { source: "telegram", medium: "paid_social", campaign: nonce, content: "test_channel", role: "admin" } }, expected: 201 });
 const id = created.result.id;
+await call("/api/analytics", { expected: 401 });
+await call("/api/analytics", { cookie: clientCookie, expected: 403 });
+const analytics = await call("/api/analytics", { cookie: adminCookie });
+const campaign = analytics.result.rows.find(row => row.campaign === nonce);
+assert.equal(campaign?.source, "telegram");
+assert.equal(campaign?.requests, 1);
+assert.equal(campaign?.content, "test_channel");
+assert.equal(campaign?.completed, 0);
 const initial = await call(`/api/orders/${id}`, { cookie: adminCookie });
 await call(`/api/orders/${id}`, { cookie: strangerCookie, expected: 404 });
 const listing = await call("/api/orders", { cookie: adminCookie });

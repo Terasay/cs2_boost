@@ -1,4 +1,5 @@
 import { ratingValue } from "@/lib/order-validation";
+import { cleanAttribution } from "@/lib/attribution.mjs";
 import { desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { orders, users } from "@/db/schema";
@@ -45,7 +46,8 @@ async function POSTHandler(request: Request) {
   if (retry) return fail("Too many requests. Try again later", 429);
   const now = Date.now();
   const id = crypto.randomUUID();
-  await getDb().insert(orders).values({ id, userId: user.id, platform, service, method, currentRating, targetRating, status: "new", riskAcceptedAt: now, createdAt: now, updatedAt: now });
+  const attribution = cleanAttribution(input.attribution);
+  await getDb().insert(orders).values({ id, userId: user.id, platform, service, method, currentRating, targetRating, status: "new", source: attribution?.source ?? null, medium: attribution?.medium ?? null, campaign: attribution?.campaign ?? null, campaignContent: attribution?.content ?? null, riskAcceptedAt: now, createdAt: now, updatedAt: now });
   return privateJson({ id }, 201);
 }
 

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { writeStorage } from "@/lib/browser-storage";
+import { readCampaign } from "@/lib/campaign-storage";
 import { AccountShell, api, readDraft, Draft, User, useLanguage } from "../account-ui";
 
 export default function Register() {
@@ -28,12 +29,12 @@ export default function Register() {
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if(loading||!ready)return;
-    if(!draft){window.location.assign("/#calculator");return}
+    if(!draft){window.location.assign(`/${lang}#calculator`);return}
     if(!accepted){setError(lang==="ru"?"Подтвердите ознакомление с рисками.":"Please acknowledge the risks.");return}
     setLoading(true);setError("");
     try{
       if(!user){const auth=await api<{user:User}>("/api/auth/register",{method:"POST",body:JSON.stringify({email,password})});setUser(auth.user);setPassword("")}
-      const result=await api<{id:string}>("/api/orders",{method:"POST",body:JSON.stringify({...draft,riskAccepted:true})});
+      const result=await api<{id:string}>("/api/orders",{method:"POST",body:JSON.stringify({...draft,riskAccepted:true,attribution:readCampaign()})});
       writeStorage("sessionStorage","cs2-draft",null);
       window.location.assign(`/orders/${result.id}`);
     }catch(reason){setError(reason instanceof Error?reason.message:"Error");setLoading(false)}

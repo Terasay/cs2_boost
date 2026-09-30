@@ -33,7 +33,7 @@ test("fresh migrations, admin promotion, and consistent database backup", () => 
     try {
       assert.equal(restored.pragma("integrity_check", { simple: true }), "ok");
       assert.equal(restored.prepare("SELECT role FROM users WHERE id = ?").get(id).role, "admin");
-      assert.equal(restored.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, 4);
+      assert.equal(restored.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, 5);
     } finally { restored.close(); }
   } finally { database.close(); }
 });

@@ -14,7 +14,10 @@ const nextConfig: NextConfig = {
       { key: "Content-Security-Policy", value: `default-src 'self'; script-src 'self' 'unsafe-inline'${development ? " 'unsafe-eval'" : ""}; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'${development ? " ws: wss:" : ""}; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'` },
       ...(!development ? [{ key: "Strict-Transport-Security", value: "max-age=31536000" }] : []),
     ];
-    return ["/", "/:path*"].map(source => ({ source, headers }));
+    return [
+      ...["/", "/:path*"].map(source => ({ source, headers })),
+      ...["/api/:path*", "/dashboard", "/analytics", "/account", "/login", "/register", "/orders/:path*", "/support/:path*", "/inbox"].map(source => ({ source, headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] })),
+    ];
   },
 };
 

@@ -36,6 +36,10 @@ export const orders = sqliteTable("orders", {
   quotedCurrency: text("quoted_currency"),
   deadline: text("deadline"),
   riskAcceptedAt: integer("risk_accepted_at").notNull(),
+  source: text("source"),
+  medium: text("medium"),
+  campaign: text("campaign"),
+  campaignContent: text("campaign_content"),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 }, table => [index("orders_user_created_idx").on(table.userId, table.createdAt)]);
