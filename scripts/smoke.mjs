@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { writeFileSync, mkdirSync } from "node:fs";
 import assert from "node:assert/strict";
 import { databasePath } from "../db/connection.mjs";
+import { hashPassword } from "../lib/password.ts";
 
 const base = process.env.SITE_TEST_URL ?? "http://127.0.0.1:3000";
 const origin = process.env.SITE_TEST_ORIGIN || new URL(base).origin;
@@ -33,7 +34,7 @@ async function call(path, { method = "GET", body, cookie = "", headers = {}, exp
     headers: { "X-Real-IP": "127.0.0.1", Connection: "close", ...(body ? { "Content-Type": "application/json" } : {}), ...(method !== "GET" ? { Origin: origin } : {}), ...(cookie ? { Cookie: cookie } : {}), ...headers },
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (path === "/api/auth/register" && response.status === 200 && origin.startsWith("https:")) {
+  if (path === "/api/auth/login" && response.status === 200 && origin.startsWith("https:")) {
     assert.match(response.headers.get("set-cookie") ?? "", /^__Host-cs2_session=.+; HttpOnly; SameSite=Lax; Path=\/; Max-Age=\d+; Secure$/);
   }
   const raw = await response.text();
@@ -43,16 +44,21 @@ async function call(path, { method = "GET", body, cookie = "", headers = {}, exp
   return { result, cookie: response.headers.get("set-cookie")?.split(";")[0] ?? "" };
 }
 
-const admin = await call("/api/auth/register", { method: "POST", body: { email: adminEmail, password, role: "admin" } });
-if (admin.result.user.role !== "client") throw new Error("Public registration granted admin role");
+async function fixture(email) {
+  const id = crypto.randomUUID();
+  const database = new DatabaseSync(dbFile);
+  try { database.prepare("INSERT INTO users (id,email,password_hash,email_verified_at,created_at) VALUES (?,?,?,?,?)").run(id,email,await hashPassword(password),Date.now(),Date.now()); }
+  finally { database.close(); }
+  fixtureIds.push(id);
+  return call("/api/auth/login", { method: "POST", body: { email, password } });
+}
+const admin = await fixture(adminEmail);
+if (admin.result.user.role !== "client") throw new Error("Client fixture unexpectedly has admin role");
 const adminCookie = admin.cookie;
-fixtureIds.push(admin.result.user.id);
-const client = await call("/api/auth/register", { method: "POST", body: { email: clientEmail, password } });
+const client = await fixture(clientEmail);
 let clientCookie = client.cookie;
-fixtureIds.push(client.result.user.id);
-const stranger = await call("/api/auth/register", { method: "POST", body: { email: strangerEmail, password } });
+const stranger = await fixture(strangerEmail);
 const strangerCookie = stranger.cookie;
-fixtureIds.push(stranger.result.user.id);
 await call("/api/orders", { method: "POST", cookie: clientCookie, body: { platform: "premier", service: "rating", method: "duo", current: 4000, target: 5000, riskAccepted: true }, headers: { Origin: "https://evil.example" }, expected: 403 });
 
 sql(`UPDATE users SET role = 'admin' WHERE id = '${admin.result.user.id}'`);

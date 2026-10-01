@@ -23,7 +23,7 @@ as_app npm ci --include=dev --no-audit --no-fund
 as_app env NODE_OPTIONS=--max-old-space-size=768 npm run build
 install -d -m 700 -o cs2boost -g cs2boost /opt/cs2-boost/.next/cache
 as_app env NODE_ENV=production node scripts/migrate.mjs
-as_app env NODE_ENV=production node scripts/check-config.mjs
+as_app env NODE_ENV=production node --env-file=/etc/cs2-boost.env scripts/check-config.mjs
 systemctl start cs2-boost
 curl --fail --retry 10 --retry-connrefused --retry-delay 2 http://127.0.0.1:3000/api/health
 printf '\n%s\n' 'Update complete. Existing Nginx, HTTPS and environment settings were preserved.'

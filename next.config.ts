@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
     ];
     return [
       ...["/", "/:path*"].map(source => ({ source, headers })),
-      ...["/api/:path*", "/dashboard", "/analytics", "/account", "/login", "/register", "/orders/:path*", "/support/:path*", "/inbox"].map(source => ({ source, headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] })),
+      ...["/api/:path*", "/dashboard", "/analytics", "/account", "/login", "/register", "/verify-email", "/orders/:path*", "/support/:path*", "/inbox"].map(source => ({ source, headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] })),
     ];
   },
 };

@@ -7,7 +7,16 @@ export const users = sqliteTable("users", {
   sessionVersion: integer("session_version").notNull().default(0),
   role: text("role", { enum: ["client", "admin"] }).notNull().default("client"),
   createdAt: integer("created_at").notNull(),
+  emailVerifiedAt: integer("email_verified_at"),
 });
+
+export const emailVerifications = sqliteTable("email_verifications", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull(),
+  draft: text("draft"),
+  createdAt: integer("created_at").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+}, table => [index("email_verifications_email_idx").on(table.email), index("email_verifications_expiry_idx").on(table.expiresAt)]);
 
 export const sessions = sqliteTable("sessions", {
   id: text("id").primaryKey(),

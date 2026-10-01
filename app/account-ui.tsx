@@ -34,6 +34,9 @@ export class ApiError extends Error {
 }
 
 const errorMessages: Record<string, string> = {
+  "Verification link is invalid or expired": "Ссылка недействительна, уже использована или истекла. Запросите новое письмо.",
+  "Registration email unavailable. Try again later": "Не удалось отправить письмо. Попробуйте позже. Если аккаунт уже есть, войдите в него.",
+  "Wait before requesting another email": "Подождите минуту перед повторной отправкой письма.",
   "Sign in required": "Войдите в аккаунт, чтобы продолжить.",
   "Incorrect email or password": "Неверный email или пароль.",
   "Incorrect current password": "Текущий пароль указан неверно.",
