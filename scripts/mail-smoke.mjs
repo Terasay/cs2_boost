@@ -45,7 +45,7 @@ try {
     await delay(250);
   }
   assert(ready, logs);
-  const draft = { platform: "premier", service: "rating", method: "duo", current: 4500, target: 10000 };
+  const draft = { platform: "premier", service: "rating", method: "duo", current: 4500, target: 10000, redTrust: true, promoCode: "Cherep" };
   await post("register", { email }, 403, "https://evil.example");
   const pending = await post("register", { email, password: "ignored", role: "admin", lang: "en", draft, attribution: { source: "test", password: "drop" } }, 202);
   assert.equal(pending.response.headers.get("set-cookie"), null);

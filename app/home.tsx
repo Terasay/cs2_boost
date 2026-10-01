@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { writeStorage } from "@/lib/browser-storage";
+import { readStorage, writeStorage } from "@/lib/browser-storage";
+import { calculatePrice, type Price } from "@/lib/pricing.mjs";
+import { PriceSummary, PromoInput } from "./price-summary";
 import { api } from "./account-ui";
 import Image from "next/image";
 import { ArrowRight, Crosshair, MessageSquare } from "lucide-react";
@@ -28,7 +30,7 @@ const words = {
     continue:"Продолжить оформление",accountLater:"Аккаунт создаётся на следующем шаге",invalid:"Укажите текущий и желаемый рейтинг. Цель должна быть выше текущего.",
     serviceTitle:"Под ваш формат игры",s1:"Буст рейтинга",s1d:"Выберите Premier или FACEIT и укажите свой целевой рейтинг.",s2:"Калибровка",s2d:"Согласуем цель и условия перед началом матчей.",s3:"Два способа",s3d:"Играйте вместе с исполнителем или выберите выполнение на аккаунте.",
     processTitle:"Три шага до заказа",p1:"Задайте цель",p1d:"Выберите площадку, услугу и желаемый результат.",p2:"Согласуйте условия",p2d:"Администратор подтвердит цену и срок.",p3:"Следите за работой",p3d:"Статус заказа и чат доступны в личном кабинете.",
-    faqTitle:"Перед оформлением",q1:"Когда будет известна цена?",a1:"После заявки администратор рассчитает стоимость по вашим параметрам. Вы увидите её до оплаты.",q2:"Нужно ли создавать аккаунт сразу?",a2:"Нет. Сначала выберите параметры, затем создайте аккаунт для оформления заказа.",q3:"Можно ли играть вместе с исполнителем?",a3:"Да, выберите «Игра вместе» в форме заказа."
+    faqTitle:"Перед оформлением",q1:"Когда будет известна цена?",a1:"Для буста цена и срок видны в калькуляторе и сохраняются при оформлении. Тариф зависит от исходного рейтинга; красный траст в Premier добавляет 10%, промокод даёт скидку 20%. Условия калибровки согласуются отдельно.",q2:"Нужно ли создавать аккаунт сразу?",a2:"Нет. Сначала выберите параметры, затем создайте аккаунт для оформления заказа.",q3:"Можно ли играть вместе с исполнителем?",a3:"Да, выберите «Игра вместе» в форме заказа."
   },
   en: {
     services:"Services",process:"How it works",faq:"FAQ",login:"Sign in",eyebrow:"CS2 / PREMIER / FACEIT",
@@ -40,7 +42,7 @@ const words = {
     continue:"Continue to order",accountLater:"Create an account in the next step",invalid:"Enter your current and target rating. The target must be higher.",
     serviceTitle:"Your game, your format",s1:"Rating boost",s1d:"Choose Premier or FACEIT and set your target rating.",s2:"Calibration",s2d:"Agree on the goal and terms before matches start.",s3:"Two methods",s3d:"Play with the booster or arrange a piloted order.",
     processTitle:"Three steps to order",p1:"Set your goal",p1d:"Choose the platform, service and target.",p2:"Agree on terms",p2d:"An admin confirms the price and deadline.",p3:"Track progress",p3d:"Order status and chat are available in your account.",
-    faqTitle:"Before you order",q1:"When will I know the price?",a1:"An admin will price your request after reviewing the details. You see the quote before paying.",q2:"Do I need an account right away?",a2:"No. Configure your request first, then create an account to submit it.",q3:"Can I play with the booster?",a3:"Yes. Choose “Play together” in the order form."
+    faqTitle:"Before you order",q1:"When will I know the price?",a1:"For rating boosts, the calculator shows the price and duration before you submit. The rate depends on your starting rating; Premier red trust adds 10%, and a promo code takes 20% off. Calibration is agreed separately.",q2:"Do I need an account right away?",a2:"No. Configure your request first, then create an account to submit it.",q3:"Can I play with the booster?",a3:"Yes. Choose “Play together” in the order form."
   }
 };
 
@@ -50,10 +52,15 @@ export default function Home({ lang, initialPlatform = "premier", initialService
   const [method,setMethod]=useState<Method>("duo");
   const [current,setCurrent]=useState("");
   const [target,setTarget]=useState("");
+  const [redTrust,setRedTrust]=useState(false);
+  const [promoCode,setPromoCode]=useState("");
   const [error,setError]=useState("");
   const [signedIn,setSignedIn]=useState(false);
   useEffect(()=>{let active=true;void api<{user:unknown}>("/api/auth/me").then(result=>{if(active)setSignedIn(Boolean(result.user))}).catch(()=>{});return()=>{active=false}},[]);
   const t=words[lang];
+  useEffect(()=>{const query = new URLSearchParams(window.location.search).get("promo"); const timer=setTimeout(()=>{setPromoCode(query ?? readStorage("sessionStorage","cs2-promo") ?? ""); if(query !== null)writeStorage("sessionStorage","cs2-promo",query.slice(0,32));},0);return()=>clearTimeout(timer)},[]);
+  let price: Price | null = null;
+  try { if(service === "calibration" || (current && target))price = calculatePrice({platform,service,current:Number(current),target:Number(target),redTrust:platform === "premier" && redTrust,promoCode}); } catch {}
   useEffect(()=>{
     type Context = { registerTool: (tool: { name:string; title:string; description:string; inputSchema:object; annotations:{readOnlyHint:boolean}; execute:(input:unknown)=>Promise<unknown> }, options:{signal:AbortSignal})=>void|Promise<void> };
     const context=(document as Document & {modelContext?:Context}).modelContext;
@@ -89,7 +96,8 @@ export default function Home({ lang, initialPlatform = "premier", initialService
     const start=Number(current),end=Number(target);
     if(service==="rating"&&(!current||!target||!Number.isInteger(start)||!Number.isInteger(end)||start<0||end<=start||end>100000)){setError(t.invalid);return}
     setError("");
-    if(!writeStorage("sessionStorage","cs2-draft",JSON.stringify({platform,service,method,current:service==="rating"?start:null,target:service==="rating"?end:null}))){setError(lang==="ru"?"Разрешите хранение данных в браузере, чтобы продолжить оформление.":"Allow browser storage to continue your request.");return}
+    if(!price){setError(lang==="ru"?"Проверьте рейтинг и промокод.":"Check the ratings and promo code.");return}
+    if(!writeStorage("sessionStorage","cs2-draft",JSON.stringify({platform,service,method,current:service==="rating"?start:null,target:service==="rating"?end:null,redTrust:platform==="premier"&&redTrust,promoCode:price.promoCode}))){setError(lang==="ru"?"Разрешите хранение данных в браузере, чтобы продолжить оформление.":"Allow browser storage to continue your request.");return}
     window.location.assign("/register");
   }
   return <div className="site">
@@ -104,7 +112,10 @@ export default function Home({ lang, initialPlatform = "premier", initialService
             <div className="field"><label htmlFor="service">{t.service}</label><Select value={service} onValueChange={value=>setService(value as Service)}><SelectTrigger id="service" className="select-control"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="rating">{t.rating}</SelectItem><SelectItem value="calibration">{t.calibration}</SelectItem></SelectContent></Select></div>
             <div className="field"><label>{t.method}</label><RadioGroup className="methods" value={method} onValueChange={value=>setMethod(value as Method)}><label className={method==="duo"?"selected":""}><RadioGroupItem value="duo"/>{t.duo}</label><label className={method==="piloted"?"selected":""}><RadioGroupItem value="piloted"/>{t.piloted}</label></RadioGroup></div>
             {service==="rating"?<div className="rating-row"><div className="field"><label htmlFor="current">{t.current}</label><Input id="current" type="number" min="0" inputMode="numeric" value={current} onChange={event=>setCurrent(event.target.value)} placeholder="4 500" className="rating-control"/></div><div className="field"><label htmlFor="target">{t.target}</label><Input id="target" type="number" min="1" inputMode="numeric" value={target} onChange={event=>setTarget(event.target.value)} placeholder="10 000" className="rating-control"/></div></div>:<p className="calibration-hint">{t.calibrationHint}</p>}
-            <div className="estimate"><div><span>{t.quote}</span><strong>{t.quoteValue}</strong></div><p>{t.quoteHint}</p></div>
+            {platform === "premier" && <label className="trust-check"><input type="checkbox" checked={redTrust} onChange={event=>setRedTrust(event.target.checked)}/><span>{lang === "ru" ? "На аккаунте красный траст · +10%" : "Red trust on this account · +10%"}</span></label>}
+            <p className="tariff-note">{platform === "premier" ? (lang === "ru" ? "500 ₽ / 1 000 рейтинга. При исходном рейтинге выше 10 000 — 700 ₽." : "500 RUB / 1,000 rating. Starting above 10,000: 700 RUB.") : (lang === "ru" ? "500 ₽ / 100 ELO. При исходном ELO выше 1 200 — 700 ₽." : "500 RUB / 100 ELO. Starting above 1,200: 700 RUB.")}<br/>{lang === "ru" ? "Неполный шаг оплачивается пропорционально; срок округляется до целого дня." : "Partial steps are priced proportionally; delivery time rounds up to a whole day."}</p>
+            <PromoInput value={promoCode} onChange={value=>{setPromoCode(value);writeStorage("sessionStorage","cs2-promo",value)}} ru={lang === "ru"}/>
+            <PriceSummary price={price} ru={lang === "ru"}/>
             {error&&<p className="error" role="alert">{error}</p>}
             <Button className="continue-button" onClick={next}>{t.continue}<ArrowRight size={19}/></Button><p className="under-button">{signedIn?(lang==="ru"?"Заявка сохранится в личном кабинете":"Your request will be saved in your account"):t.accountLater}</p>
           </div>

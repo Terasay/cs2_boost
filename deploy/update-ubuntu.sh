@@ -10,6 +10,8 @@ if [[ "$repo_dir" != /opt/cs2-boost || ! -f /etc/cs2-boost.env ]]; then
     echo "An existing installation in /opt/cs2-boost is required"
     exit 1
 fi
+node_bin=/opt/node24/bin/node
+"$node_bin" "$repo_dir/scripts/ensure-access-key.mjs" /etc/cs2-boost.env
 source /etc/cs2-boost.env
 export PATH=/opt/node24/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 cd /opt/cs2-boost

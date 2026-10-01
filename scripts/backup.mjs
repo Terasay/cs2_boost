@@ -8,6 +8,7 @@ const destination = join(directory, `cs2-${new Date().toISOString().replaceAll("
 if (destination === databasePath()) throw new Error("Backup must be separate from the database");
 const database = openDatabase();
 try {
+  if (database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='order_access'").get()) database.prepare("DELETE FROM order_access WHERE expires_at < ?").run(Date.now());
   await database.backup(destination);
   if (process.platform !== "win32") chmodSync(destination, 0o600);
   const backups = readdirSync(directory).filter(name => /^cs2-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{3}Z\.sqlite$/.test(name)).sort().reverse();

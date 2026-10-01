@@ -1,11 +1,12 @@
 "use client";
 
-import { BarChart3, ChevronLeft, ChevronRight, ListFilter, MessagesSquare, Settings2 } from "lucide-react";
+import { BarChart3, ChevronLeft, ChevronRight, ListFilter, MessagesSquare, Settings2, TicketPercent } from "lucide-react";
 
-export function WorkspaceNav({ active, ru }: { active: "orders" | "inbox"; ru: boolean }) {
+export function WorkspaceNav({ active, ru }: { active: "orders" | "inbox" | "promos"; ru: boolean }) {
   return <nav className="workspace-nav" aria-label={ru ? "Администрирование" : "Administration"}>
     <a className={active === "orders" ? "active" : ""} href="/dashboard" aria-current={active === "orders" ? "page" : undefined}><ListFilter size={17}/>{ru ? "Заказы" : "Orders"}</a>
     <a className={active === "inbox" ? "active" : ""} href="/inbox" aria-current={active === "inbox" ? "page" : undefined}><MessagesSquare size={17}/>{ru ? "Входящие" : "Inbox"}</a>
+    <a className={active === "promos" ? "active" : ""} href="/promos" aria-current={active === "promos" ? "page" : undefined}><TicketPercent size={17}/>{ru ? "Промокоды" : "Promo codes"}</a>
     <a href="/analytics"><BarChart3 size={17}/>{ru ? "Источники" : "Sources"}</a><a href="/account"><Settings2 size={17}/>{ru ? "Настройки" : "Settings"}</a>
   </nav>;
 }

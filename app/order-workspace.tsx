@@ -1,15 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, ArrowUpRight, Check, ChevronDown, Save } from "lucide-react";
+import { ArrowRight, ArrowUpRight, ChevronDown } from "lucide-react";
 import { AccountShell, api, statusLabels, useLanguage } from "./account-ui";
 import { ConversationPanel } from "./conversation-panel";
 import { useLiveResource } from "./use-live-resource";
+import { OrderActions, OrderHistory, OrderTimer, SecureOrderAccess, type AccessInfo, type Order, type OrderEvent } from "./order-controls";
+import { money } from "@/lib/pricing.mjs";
 import type { ChatMessage, ChatPage } from "./chat-history";
 
-type Order = { id: string; clientEmail: string; platform: string; service: string; method: string; currentRating: number | null; targetRating: number | null; status: string; quotedPrice: number | null; deadline: string | null; updatedAt: number };
-type Detail = ChatPage & { order: Order; currentUserId: string; role: "client" | "admin" };
-type Draft = { price: string; deadline: string; status: string; version: number };
+type Detail = ChatPage & { order: Order; access: AccessInfo; events: OrderEvent[]; currentUserId: string; role: "client" | "admin" };
 
 export default function OrderWorkspace({ id, embedded = false, onActivity }: { id: string; embedded?: boolean; onActivity?: () => void }) {
   const lang = useLanguage();
@@ -18,30 +18,40 @@ export default function OrderWorkspace({ id, embedded = false, onActivity }: { i
   const resource = useLiveResource<Detail>(endpoint, 5000, true);
   const { data, reload, update } = resource;
   const order = data?.order;
-  const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [saved, setSaved] = useState(false);
-  const form = draft || { price: order?.quotedPrice?.toString() || "", deadline: order?.deadline || "", status: order?.status || "new", version: order?.updatedAt || 0 };
-  const conflict = Boolean(draft && order && draft.version !== order.updatedAt);
-  function edit(value: Partial<Draft>) { setDraft({ ...form, ...value }); setSaved(false); }
-  async function save(accept = false) {
-    if (busy || !order) return;
-    setBusy(true); setError(""); setSaved(false);
+  const total = order?.totalAmount ?? (order?.quotedPrice === null || !order ? null : order.quotedPrice * 100);
+  const currency = order?.quotedCurrency || (order?.pricingVersion ? "RUB" : "KZT");
+  async function run(action: string, values: Record<string, unknown> = {}) {
+    if (busy || !order) return false;
+    setBusy(true); setError("");
     try {
-      await api(endpoint, { method: "PATCH", body: JSON.stringify(accept ? { action: "accept", updatedAt: order.updatedAt } : { status: form.status, quotedPrice: form.price, deadline: form.deadline, updatedAt: form.version }) });
-      setDraft(null); setSaved(true); await reload(); onActivity?.();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Error"); void reload(); }
+      await api(endpoint, { method: "PATCH", body: JSON.stringify({ action, updatedAt: order.updatedAt, ...values }) });
+      await reload(); onActivity?.(); return true;
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Error"); void reload(); return false; }
     finally { setBusy(false); }
   }
   function sent(message?: ChatMessage) { if (message) update(value => ({ ...value, messages: [...value.messages.filter(item => item.id !== message.id), message] })); void reload(); onActivity?.(); }
   const content = <div className={embedded ? "order-workspace embedded" : "order-workspace"}>
     <header className="order-workspace-heading"><div><span className="kicker">{ru ? "ЗАКАЗ" : "ORDER"} / #{id.slice(0, 8).toUpperCase()}</span><h1>{order ? `${order.platform.toUpperCase()} · ${order.service === "rating" ? (ru ? "Буст рейтинга" : "Rating boost") : (ru ? "Калибровка" : "Calibration")}` : (ru ? "Загрузка заказа…" : "Loading order…")}</h1><p>{order?.clientEmail}</p></div>{order && <div className="order-workspace-badges"><span className={`status status-${order.status}`}>{statusLabels[order.status]?.[lang] || order.status}</span>{embedded && <a className="icon-button" href={`/orders/${id}`} aria-label={ru ? "Открыть полный заказ" : "Open full order"}><ArrowUpRight size={18}/></a>}</div>}</header>
     {(resource.error || error) && <p className="error" role="alert">{error || resource.error}</p>}
-    {data && order && <div className="order-workspace-grid"><details className="order-inspector" open><summary>{ru ? "Условия и управление" : "Terms and management"}<ChevronDown size={17}/></summary><div className="inspector-body"><div className="rating-summary"><span>{order.service === "rating" ? (ru ? "Рейтинг" : "Rating") : (ru ? "Услуга" : "Service")}</span>{order.service === "rating" ? <strong>{order.currentRating?.toLocaleString()}<ArrowRight size={18}/>{order.targetRating?.toLocaleString()}</strong> : <strong>{ru ? "Калибровка" : "Calibration"}</strong>}<small>{order.method === "duo" ? (ru ? "Игра вместе" : "Duo play") : (ru ? "На аккаунте" : "Piloted play")}</small></div>
-      <dl className="compact-terms"><div><dt>{ru ? "Стоимость" : "Price"}</dt><dd>{order.quotedPrice === null ? (ru ? "Ожидает расчёта" : "Pending quote") : `${order.quotedPrice.toLocaleString(ru ? "ru-RU" : "en-US")} ₸`}</dd></div><div><dt>{ru ? "Срок" : "Deadline"}</dt><dd>{order.deadline || "—"}</dd></div></dl>
-      {data.role === "admin" ? <form className="order-editor" onSubmit={event => { event.preventDefault(); void save(); }}><h2>{ru ? "Управление заказом" : "Manage order"}</h2><label htmlFor="order-status">{ru ? "Статус" : "Status"}</label><select id="order-status" value={form.status} disabled={busy} onChange={event => edit({ status: event.target.value })}>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label[lang]}</option>)}</select><div className="editor-fields"><div><label htmlFor="order-price">{ru ? "Цена, ₸" : "Price, KZT"}</label><input id="order-price" type="number" min="0" max="100000000" step="1" value={form.price} disabled={busy} onChange={event => edit({ price: event.target.value })}/></div><div><label htmlFor="order-deadline">{ru ? "Дата завершения" : "Completion date"}</label><input id="order-deadline" type="date" value={form.deadline} disabled={busy} onChange={event => edit({ deadline: event.target.value })}/></div></div>{conflict && <p className="error">{ru ? "Заказ изменён. Сбросьте черновик и проверьте новые условия." : "Order changed. Discard the draft and review the latest terms."}</p>}<button type="submit" className="compact-primary" disabled={busy || !draft || conflict}><Save size={16}/>{busy ? (ru ? "Сохраняем…" : "Saving…") : (ru ? "Сохранить" : "Save")}</button>{saved && <p className="saved-feedback" role="status"><Check size={14}/>{ru ? "Сохранено" : "Saved"}</p>}{draft && <button type="button" className="editor-discard" onClick={() => { setDraft(null); setError(""); }}>{ru ? "Сбросить изменения" : "Discard changes"}</button>}</form> : order.status === "quoted" ? <div className="accept-offer"><p>{ru ? "Проверьте стоимость и дату завершения перед подтверждением." : "Review the price and completion date before accepting."}</p><button className="compact-primary" disabled={busy} onClick={() => save(true)}>{ru ? "Принять предложение" : "Accept offer"}<ArrowRight size={16}/></button></div> : <p className="inspector-note">{ru ? "Все детали и изменения обсуждайте в чате этого заказа." : "Discuss details and changes in this order's chat."}</p>}
-    </div></details><ConversationPanel endpoint={endpoint} page={data} currentUserId={data.currentUserId} role={data.role} lang={lang} onSent={sent} onRefresh={reload} offline={Boolean(resource.error)} refreshing={resource.loading}/></div>}
+    {data && order && <><ol className="order-flow">{(ru ? ["Заявка","Принятие","Оплата","Данные","Выполнение"] : ["Request","Accepted","Payment","Details","Delivery"]).map((label,index)=>{const stage=order.status === "completed" ? 5 : order.startedAt ? 4 : order.paidAt ? 3 : order.status === "awaiting_payment" ? 2 : order.status === "quoted" ? 1 : 0;return <li key={label} className={order.status === "cancelled" ? "" : index <= stage ? "done" : ""}><span>{index+1}</span>{label}</li>})}</ol><div className="order-workspace-grid"><details className="order-inspector" open><summary>{ru ? "Условия и управление" : "Terms and management"}<ChevronDown size={17}/></summary><div className="inspector-body"><div className="rating-summary"><span>{order.service === "rating" ? (ru ? "Рейтинг" : "Rating") : (ru ? "Услуга" : "Service")}</span>{order.service === "rating" ? <strong>{order.currentRating?.toLocaleString()}<ArrowRight size={18}/>{order.targetRating?.toLocaleString()}</strong> : <strong>{ru ? "Калибровка" : "Calibration"}</strong>}<small>{order.method === "duo" ? (ru ? "Игра вместе" : "Duo play") : (ru ? "На аккаунте" : "Piloted play")}</small></div>
+      <dl className="compact-terms">
+        {order.baseAmount !== null && <div><dt>{ru ? "Базовая стоимость" : "Base price"}</dt><dd>{money(order.baseAmount,lang,currency)}</dd></div>}
+        {order.redTrust && <div><dt>{ru ? "Красный траст · +10%" : "Red trust · +10%"}</dt><dd>{money(order.surchargeAmount,lang,currency)}</dd></div>}
+        {order.baseAmount !== null && total !== null && total + order.discountAmount !== order.baseAmount + order.surchargeAmount && <div><dt>{ru ? "Согласованная поправка" : "Agreed adjustment"}</dt><dd>{money(total + order.discountAmount - order.baseAmount - order.surchargeAmount,lang,currency)}</dd></div>}
+        {order.promoCode && <div className="price-discount"><dt>{order.promoCode} · −20%</dt><dd>−{money(order.discountAmount,lang,currency)}</dd></div>}
+        <div className="order-total"><dt>{ru ? "Итого" : "Total"}</dt><dd>{total === null ? (ru ? "На согласовании" : "Pending agreement") : money(total,lang,currency)}</dd></div>
+        <div><dt>{ru ? "Дней на выполнение" : "Delivery days"}</dt><dd>{order.durationDays ?? "—"}</dd></div>
+        {order.initialTotalAmount !== null && order.initialTotalAmount !== total && <div><dt>{ru ? "При оформлении" : "When submitted"}</dt><dd>{money(order.initialTotalAmount,lang,currency)}</dd></div>}
+        {data.role === "admin" && order.promoCode && <div><dt>{ru ? "Доля владельца промокода" : "Promo owner's share"}</dt><dd>{money(order.commissionAmount,lang,currency)}</dd></div>}
+      </dl>
+      {!order.pricingVersion && <p className="inspector-note">{ru ? "Заказ оформлен по прежним условиям. Исторические цена и валюта сохранены." : "This order uses earlier terms. Its historical price and currency are preserved."}</p>}
+      <OrderTimer order={order} ru={ru}/>
+      <OrderActions key={order.id} order={order} admin={data.role === "admin"} ru={ru} busy={busy} run={run}/>
+      <SecureOrderAccess key={order.id} order={order} admin={data.role === "admin"} info={data.access} ru={ru} onSaved={()=>{void reload();onActivity?.();}}/>
+      <OrderHistory events={data.events} order={order} ru={ru}/>
+    </div></details><ConversationPanel endpoint={endpoint} page={data} currentUserId={data.currentUserId} role={data.role} lang={lang} onSent={sent} onRefresh={reload} offline={Boolean(resource.error)} refreshing={resource.loading}/></div></>}
   </div>;
   return embedded ? content : <AccountShell workspace back="/dashboard" backLabel={ru ? "Все заказы" : "All orders"}>{content}</AccountShell>;
 }

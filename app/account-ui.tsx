@@ -4,16 +4,17 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, Crosshair } from "lucide-react";
 import { readStorage } from "@/lib/browser-storage";
 import { ratingValue } from "@/lib/order-validation";
+import { normalizePromo } from "@/lib/pricing.mjs";
 
 export type User = { id: string; email: string; role: "client" | "admin" };
-export type Draft = { platform: "premier" | "faceit"; service: "rating" | "calibration"; method: "duo" | "piloted"; current: number | null; target: number | null };
+export type Draft = { platform: "premier" | "faceit"; service: "rating" | "calibration"; method: "duo" | "piloted"; current: number | null; target: number | null; redTrust?: boolean; promoCode?: string | null };
 
 export function readDraft(): Draft | null {
   try {
     const value = JSON.parse(readStorage("sessionStorage", "cs2-draft") ?? "null");
     if (!value || !["premier", "faceit"].includes(value.platform) || !["rating", "calibration"].includes(value.service) || !["duo", "piloted"].includes(value.method)) return null;
     if (value.service === "rating" && (ratingValue(value.current) === null || ratingValue(value.target) === null || value.target <= value.current)) return null;
-    return value as Draft;
+    return { platform: value.platform, service: value.service, method: value.method, current: value.current, target: value.target, redTrust: value.platform === "premier" && value.redTrust === true, promoCode: normalizePromo(value.promoCode) };
   } catch { return null; }
 }
 
@@ -34,6 +35,20 @@ export class ApiError extends Error {
 }
 
 const errorMessages: Record<string, string> = {
+  "Price changed. Review the calculator": "Цена изменилась. Вернитесь в калькулятор и проверьте её перед оформлением.",
+  "Unknown promo code": "Промокод не найден. Проверьте написание или удалите его.",
+  "Invalid order action": "Это действие недоступно для заказа.",
+  "Invalid order transition": "Заказ уже изменился или действие пока недоступно. Обновите страницу.",
+  "Paid terms cannot be changed": "После подтверждения оплаты стоимость менять нельзя.",
+  "Confirm the exact payment amount": "Подтвердите получение точной суммы заказа.",
+  "Offer a price and duration first": "Сначала предложите клиенту стоимость и количество дней.",
+  "Invalid duration": "Укажите допустимое целое количество дней.",
+  "Explain the change": "Укажите причину: от 3 до 1 000 символов.",
+  "Payment must be confirmed first": "Передача данных доступна после подтверждения оплаты администратором.",
+  "Enter the account login and password": "Укажите логин и пароль игрового аккаунта.",
+  "Enter the profile and available playing times": "Укажите профиль и удобное время для совместной игры.",
+  "Confirm access is ready": "Подтвердите готовность доступа или расписания к началу работы.",
+  "Secure access is not configured": "Защищённая передача данных пока не настроена на сервере.",
   "Verification link is invalid or expired": "Ссылка недействительна, уже использована или истекла. Запросите новое письмо.",
   "Registration email unavailable. Try again later": "Не удалось отправить письмо. Попробуйте позже. Если аккаунт уже есть, войдите в него.",
   "Wait before requesting another email": "Подождите минуту перед повторной отправкой письма.",
@@ -51,7 +66,7 @@ const errorMessages: Record<string, string> = {
   "Order cannot be accepted": "Предложение уже изменено или принято. Обновите страницу.",
   "Send a new quote to change accepted terms": "Для изменения согласованной цены или срока выберите статус «Предложение готово». Клиент должен подтвердить новые условия.",
   "Price and deadline are required for a quote": "Для предложения укажите цену и дату завершения.",
-  "Invalid price": "Укажите целую сумму от 0 до 100 000 000 ₸.",
+  "Invalid price": "Укажите корректную положительную сумму.",
   "Invalid deadline": "Укажите существующую дату завершения.",
   "Enter valid ratings": "Укажите целый рейтинг от 0 до 100 000. Цель должна быть выше текущего.",
   "Message must be 1–2000 characters": "Сообщение должно содержать от 1 до 2000 символов.",
@@ -75,6 +90,7 @@ export const statusLabels: Record<string, { ru: string; en: string }> = {
   new: { ru: "Новая заявка", en: "New request" },
   quoted: { ru: "Предложение готово", en: "Quote ready" },
   awaiting_payment: { ru: "Ожидает оплаты", en: "Awaiting payment" },
+  awaiting_access: { ru: "Оплачено · ждём данные", en: "Paid · awaiting details" },
   in_progress: { ru: "В работе", en: "In progress" },
   completed: { ru: "Завершён", en: "Completed" },
   cancelled: { ru: "Отменён", en: "Cancelled" },

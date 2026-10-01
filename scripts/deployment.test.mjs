@@ -10,7 +10,7 @@ test("fresh migrations, admin promotion, and consistent database backup", () => 
   const directory = mkdtempSync(resolve("work/vps-test-"));
   const databasePath = join(directory, "database.sqlite");
   const backups = join(directory, "backups");
-  const env = { ...process.env, NODE_ENV: "production", DATABASE_PATH: databasePath, BACKUP_DIR: backups, APP_ORIGIN: "https://boost.example", TRUST_PROXY: "1" };
+  const env = { ...process.env, NODE_ENV: "production", DATABASE_PATH: databasePath, BACKUP_DIR: backups, APP_ORIGIN: "https://boost.example", TRUST_PROXY: "1", ORDER_ACCESS_KEY: "ab".repeat(32) };
   const run = (script, args = []) => {
     const result = spawnSync(process.execPath, [resolve("scripts", script), ...args], { env, encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr || result.stdout);
@@ -33,7 +33,7 @@ test("fresh migrations, admin promotion, and consistent database backup", () => 
     try {
       assert.equal(restored.pragma("integrity_check", { simple: true }), "ok");
       assert.equal(restored.prepare("SELECT role FROM users WHERE id = ?").get(id).role, "admin");
-      assert.equal(restored.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, 7);
+      assert.equal(restored.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, 8);
     } finally { restored.close(); }
   } finally { database.close(); }
 });

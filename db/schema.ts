@@ -40,10 +40,29 @@ export const orders = sqliteTable("orders", {
   method: text("method", { enum: ["duo", "piloted"] }).notNull(),
   currentRating: integer("current_rating"),
   targetRating: integer("target_rating"),
-  status: text("status", { enum: ["new", "quoted", "awaiting_payment", "in_progress", "completed", "cancelled"] }).notNull().default("new"),
+  status: text("status", { enum: ["new", "quoted", "awaiting_payment", "awaiting_access", "in_progress", "completed", "cancelled"] }).notNull().default("new"),
   quotedPrice: integer("quoted_price"),
   quotedCurrency: text("quoted_currency"),
   deadline: text("deadline"),
+  pricingVersion: integer("pricing_version").notNull().default(0),
+  redTrust: integer("red_trust", { mode: "boolean" }).notNull().default(false),
+  promoCode: text("promo_code"),
+  baseAmount: integer("base_amount"),
+  surchargeAmount: integer("surcharge_amount").notNull().default(0),
+  discountAmount: integer("discount_amount").notNull().default(0),
+  totalAmount: integer("total_amount"),
+  initialTotalAmount: integer("initial_total_amount"),
+  commissionAmount: integer("commission_amount").notNull().default(0),
+  durationDays: integer("duration_days"),
+  standardDays: integer("standard_days"),
+  acceptedAt: integer("accepted_at"),
+  paidAt: integer("paid_at"),
+  startedAt: integer("started_at"),
+  dueAt: integer("due_at"),
+  completedAt: integer("completed_at"),
+  proposalAmount: integer("proposal_amount"),
+  proposalDays: integer("proposal_days"),
+  proposalReason: text("proposal_reason"),
   riskAcceptedAt: integer("risk_accepted_at").notNull(),
   source: text("source"),
   medium: text("medium"),
@@ -52,6 +71,31 @@ export const orders = sqliteTable("orders", {
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 }, table => [index("orders_user_created_idx").on(table.userId, table.createdAt), index("orders_created_idx").on(table.createdAt, table.id), index("orders_status_created_idx").on(table.status, table.createdAt, table.id)]);
+
+export const orderEvents = sqliteTable("order_events", {
+  id: text("id").primaryKey(),
+  orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  actorId: text("actor_id").notNull().references(() => users.id),
+  type: text("type").notNull(),
+  details: text("details").notNull(),
+  createdAt: integer("created_at").notNull(),
+}, table => [index("order_events_order_idx").on(table.orderId, table.createdAt)]);
+
+export const promoEarnings = sqliteTable("promo_earnings", {
+  orderId: text("order_id").primaryKey().references(() => orders.id, { onDelete: "cascade" }),
+  promoCode: text("promo_code").notNull(),
+  paidAmount: integer("paid_amount").notNull(),
+  amount: integer("amount").notNull(),
+  createdAt: integer("created_at").notNull(),
+  reversedAt: integer("reversed_at"),
+}, table => [index("promo_earnings_code_idx").on(table.promoCode, table.createdAt)]);
+
+export const orderAccess = sqliteTable("order_access", {
+  orderId: text("order_id").primaryKey().references(() => orders.id, { onDelete: "cascade" }),
+  payload: text("payload").notNull(),
+  createdAt: integer("created_at").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+}, table => [index("order_access_expiry_idx").on(table.expiresAt)]);
 
 export const messages = sqliteTable("messages", {
   id: text("id").primaryKey(),

@@ -79,9 +79,9 @@ const initial = await call(`/api/orders/${id}`, { cookie: adminCookie });
 await call(`/api/orders/${id}`, { cookie: strangerCookie, expected: 404 });
 const listing = await call("/api/orders", { cookie: adminCookie });
 if (!listing.result.orders.some(order => order.id === id)) throw new Error("Admin cannot see order");
-await call(`/api/orders/${id}`, { method: "PATCH", cookie: adminCookie, body: { status: "quoted", quotedPrice: 5000, deadline: "2026-10-10", updatedAt: initial.result.order.updatedAt } });
+await call(`/api/orders/${id}`, { method: "PATCH", cookie: adminCookie, body: { action: "propose", amount: 500000, days: 5, reason: "Additional scheduling requirements", updatedAt: initial.result.order.updatedAt } });
 const detail = await call(`/api/orders/${id}`, { cookie: clientCookie });
-if (detail.result.order.quotedPrice !== 5000) throw new Error("Client cannot see quote");
+if (detail.result.order.proposalAmount !== 500000 || detail.result.order.totalAmount !== 50000) throw new Error("Client cannot see the proposal alongside the original price");
 await call(`/api/orders/${id}`, { method: "PATCH", cookie: clientCookie, body: { action: "accept", updatedAt: detail.result.order.updatedAt } });
 await call(`/api/orders/${id}/messages`, { method: "POST", cookie: clientCookie, body: { body: "When can we start?" }, expected: 201 });
 const final = await call(`/api/orders/${id}`, { cookie: adminCookie });
@@ -103,7 +103,7 @@ await call("/api/support", { method: "POST", cookie: clientCookie, body: { body:
 const reopened = await call(`/api/support/${supportId}`, { cookie: adminCookie });
 if (reopened.result.thread.status !== "open" || reopened.result.messages.length !== 3) throw new Error("Support conversation did not reopen");
 
-await call(`/api/orders/${id}`, { method: "PATCH", cookie: adminCookie, body: { status: "awaiting_payment", quotedPrice: 6000, deadline: "2026-10-10", updatedAt: final.result.order.updatedAt }, expected: 409 });
+await call(`/api/orders/${id}`, { method: "PATCH", cookie: adminCookie, body: { status: "awaiting_payment", quotedPrice: 6000, deadline: "2026-10-10", updatedAt: final.result.order.updatedAt }, expected: 400 });
 for (const current of [null, true, {}, "4000", 1.5]) await call("/api/orders", { method: "POST", cookie: clientCookie, body: { platform: "premier", service: "rating", method: "duo", current, target: 5000, riskAccepted: true }, expected: 400 });
 await call(`/api/orders/${id}`, { method: "PATCH", cookie: adminCookie, body: { status: "quoted", quotedPrice: true, deadline: "2026-10-10", updatedAt: final.result.order.updatedAt }, expected: 400 });
 await call(`/api/orders/${id}`, { method: "PATCH", cookie: adminCookie, body: { status: "quoted", quotedPrice: 6000, deadline: "2026-02-30", updatedAt: final.result.order.updatedAt }, expected: 400 });

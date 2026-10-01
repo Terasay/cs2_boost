@@ -1,4 +1,5 @@
 import { ratingValue } from "@/lib/order-validation";
+import { calculatePrice } from "@/lib/pricing.mjs";
 import { cleanAttribution } from "@/lib/attribution.mjs";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
@@ -26,6 +27,7 @@ async function GETHandler(request: Request) {
     id: orders.id, platform: orders.platform, service: orders.service, method: orders.method,
     currentRating: orders.currentRating, targetRating: orders.targetRating, status: orders.status,
     quotedPrice: orders.quotedPrice, quotedCurrency: orders.quotedCurrency, deadline: orders.deadline,
+    totalAmount: orders.totalAmount, promoCode: orders.promoCode, durationDays: orders.durationDays, dueAt: orders.dueAt,
     createdAt: orders.createdAt, email: users.email, needsReply: orderReply,
   }).from(orders).innerJoin(users, eq(orders.userId, users.id))
     .where(filter).orderBy(desc(orders.createdAt), desc(orders.id)).limit(query.pageSize).offset((page - 1) * query.pageSize);
@@ -44,6 +46,10 @@ async function POSTHandler(request: Request) {
   if (service !== "rating" && service !== "calibration") return fail("Choose a service");
   if (method !== "duo" && method !== "piloted") return fail("Choose a method");
   if (input.riskAccepted !== true) return fail("Risk acknowledgement is required");
+  let price;
+  try { price = calculatePrice({ platform, service, current: input.current as number | null, target: input.target as number | null, promoCode: input.promoCode as string | null, redTrust: input.redTrust as boolean | undefined }); }
+  catch (error) { return fail(error instanceof Error ? error.message : "Invalid price"); }
+  if (input.expectedTotalAmount !== undefined && input.expectedTotalAmount !== price.totalAmount) return fail("Price changed. Review the calculator", 409);
   let currentRating: number | null = null, targetRating: number | null = null;
   if (service === "rating") {
     currentRating = ratingValue(input.current);
@@ -55,7 +61,7 @@ async function POSTHandler(request: Request) {
   const now = Date.now();
   const id = crypto.randomUUID();
   const attribution = cleanAttribution(input.attribution);
-  await getDb().insert(orders).values({ id, userId: user.id, platform, service, method, currentRating, targetRating, status: "new", source: attribution?.source ?? null, medium: attribution?.medium ?? null, campaign: attribution?.campaign ?? null, campaignContent: attribution?.content ?? null, riskAcceptedAt: now, createdAt: now, updatedAt: now });
+  await getDb().insert(orders).values({ id, userId: user.id, platform, service, method, currentRating, targetRating, status: "new", pricingVersion: price.pricingVersion, redTrust: price.redTrust, promoCode: price.promoCode, baseAmount: price.baseAmount, surchargeAmount: price.surchargeAmount, discountAmount: price.discountAmount, totalAmount: price.totalAmount, initialTotalAmount: price.totalAmount, commissionAmount: price.commissionAmount, durationDays: price.durationDays, standardDays: price.durationDays, quotedCurrency: "RUB", source: attribution?.source ?? null, medium: attribution?.medium ?? null, campaign: attribution?.campaign ?? null, campaignContent: attribution?.content ?? null, riskAcceptedAt: now, createdAt: now, updatedAt: now });
   return privateJson({ id }, 201);
 }
 

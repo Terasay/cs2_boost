@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { messages, orders, supportMessages, supportThreads, users } from "@/db/schema";
 
-export const orderStatuses = ["new", "quoted", "awaiting_payment", "in_progress", "completed", "cancelled"] as const;
+export const orderStatuses = ["new", "quoted", "awaiting_payment", "awaiting_access", "in_progress", "completed", "cancelled"] as const;
 export const orderReply = sql<number>`coalesce((select ${messages.senderId} from ${messages} where ${messages.orderId} = ${orders.id} order by ${messages.createdAt} desc, ${messages.id} desc limit 1) = ${orders.userId}, 0)`;
 export const supportReply = sql<number>`coalesce((select ${supportMessages.senderId} from ${supportMessages} where ${supportMessages.threadId} = ${supportThreads.id} order by ${supportMessages.createdAt} desc, ${supportMessages.id} desc limit 1) = ${supportThreads.userId}, 0)`;
 

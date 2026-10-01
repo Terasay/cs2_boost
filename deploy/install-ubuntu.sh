@@ -72,6 +72,7 @@ install -d -m 700 -o cs2boost -g cs2boost /opt/cs2-boost/.next/cache
 runuser -u cs2boost -- env PATH="$PATH" NODE_ENV=production DATABASE_PATH=/var/lib/cs2-boost/cs2.sqlite node scripts/migrate.mjs
 
 install -m 640 -o root -g cs2boost deploy/cs2-boost.env /etc/cs2-boost.env
+node scripts/ensure-access-key.mjs /etc/cs2-boost.env
 install -m 644 deploy/cs2-boost.service deploy/cs2-boost-backup.service deploy/cs2-boost-backup.timer /etc/systemd/system/
 install -m 644 deploy/nginx.conf /etc/nginx/sites-available/cs2-boost
 ln -s /etc/nginx/sites-available/cs2-boost /etc/nginx/sites-enabled/cs2-boost
