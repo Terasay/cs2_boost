@@ -1,0 +1,31 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { ArrowLeft, Headset, MessagesSquare, Search } from "lucide-react";
+import { AccountShell, statusLabels, useLanguage } from "../account-ui";
+import { Pagination, WorkspaceNav } from "../workspace-ui";
+import { useDebounced, useLiveResource } from "../use-live-resource";
+import OrderWorkspace from "../order-workspace";
+import SupportWorkspace from "../support-workspace";
+
+type Item = { id: string; email: string; platform?: string; status: string; lastMessage: string | null; lastActivity: number; needsReply: number };
+type Inbox = { orderChats: Item[]; supportChats: Item[]; total: number; page: number; pages: number; totals: { orders: number; support: number } };
+export default function InboxWorkspace() {
+  const lang = useLanguage(); const ru = lang === "ru";
+  const [tab, setTab] = useState<"orders" | "support">("orders");
+  const [selected, setSelected] = useState<string | null>(null);
+  const [query, setQuery] = useState(""); const search = useDebounced(query);
+  const [page, setPage] = useState(1); const [reply, setReply] = useState(false);
+  const params = new URLSearchParams({ kind: tab, q: search, page: String(page), ...(reply ? { reply: "1" } : {}) });
+  const resource = useLiveResource<Inbox>(`/api/inbox?${params}`, 10000);
+  const data = resource.data;
+  useEffect(() => { const timer = setTimeout(() => { const value = new URLSearchParams(window.location.search).get("order"); if (value && /^[0-9a-f-]{36}$/.test(value)) setSelected(value); }, 0); return () => clearTimeout(timer); }, []);
+  function switchTab(value: "orders" | "support") { setTab(value); setSelected(null); setPage(1); }
+  const items = tab === "orders" ? data?.orderChats : data?.supportChats;
+  return <AccountShell workspace><WorkspaceNav active="inbox" ru={ru}/><header className="board-heading"><div><span className="kicker">ADMIN / MESSAGES</span><h1>{ru ? "Входящие" : "Inbox"}</h1><p>{ru ? "Заказы и поддержка. Выберите диалог, чтобы ответить." : "Orders and support. Select a conversation to reply."}</p></div></header>
+    <div className={selected ? "inbox-workspace has-selection" : "inbox-workspace"}><aside className="conversation-list"><div className="conversation-tabs" role="tablist" aria-label={ru ? "Тип переписки" : "Conversation type"}>{(["orders", "support"] as const).map(value => <button key={value} role="tab" aria-selected={tab === value} className={tab === value ? "active" : ""} onClick={() => switchTab(value)}>{value === "orders" ? <MessagesSquare size={16}/> : <Headset size={16}/>}<span>{value === "orders" ? (ru ? "Заказы" : "Orders") : (ru ? "Поддержка" : "Support")}</span><small>{data?.totals[value] ?? "—"}</small></button>)}</div><div className="conversation-search"><label className="search-field"><Search size={16}/><input value={query} maxLength={120} aria-label={ru ? "Поиск диалогов" : "Search conversations"} placeholder={ru ? "Email или номер" : "Email or ID"} onChange={event => { setQuery(event.target.value); setPage(1); }}/></label><button className={reply ? "filter-chip active" : "filter-chip"} aria-pressed={reply} onClick={() => { setReply(!reply); setPage(1); }}>{ru ? "Ждут ответа" : "Awaiting reply"}</button></div>
+      {resource.error && <p className="error board-error" role="alert">{resource.error}</p>}<div className="conversation-items">{!data ? <div className="list-placeholder">{resource.error ? (ru ? "Нет доступа к перепискам" : "Conversations unavailable") : (ru ? "Загружаем…" : "Loading…")}</div> : !items?.length ? <div className="list-placeholder">{ru ? "Диалоги не найдены" : "No conversations found"}</div> : items.map(item => <button className={selected === item.id ? "conversation-item selected" : "conversation-item"} key={item.id} onClick={() => setSelected(item.id)} aria-pressed={selected === item.id}><span className="conversation-avatar">{item.email[0].toUpperCase()}</span><span className="conversation-item-content"><span className="conversation-item-top"><strong title={item.email}>{item.email}</strong><time>{new Date(item.lastActivity).toLocaleDateString(ru ? "ru-RU" : "en-US", { day: "2-digit", month: "short" })}</time></span><span className="conversation-snippet">{item.lastMessage || (ru ? "Сообщений пока нет" : "No messages yet")}</span><span className="conversation-item-bottom"><small>{item.platform?.toUpperCase() || "SUPPORT"} · #{item.id.slice(0, 6).toUpperCase()}</small>{item.needsReply ? <span className="waiting-dot">{ru ? "Ответить" : "Reply"}</span> : <small>{statusLabels[item.status]?.[lang] || (item.status === "closed" ? (ru ? "Закрыто" : "Closed") : (ru ? "Открыто" : "Open"))}</small>}</span></span></button>)}</div>{data && <Pagination page={data.page} pages={data.pages} total={data.total} busy={resource.loading} onPage={setPage} ru={ru}/>}</aside>
+      <div className="inbox-detail">{selected ? <><button className="mobile-back" onClick={() => setSelected(null)}><ArrowLeft size={16}/>{ru ? "К диалогам" : "Conversations"}</button>{tab === "orders" ? <OrderWorkspace key={selected} id={selected} embedded onActivity={resource.reload}/> : <SupportWorkspace key={selected} id={selected} embedded onActivity={resource.reload}/>}</> : <div className="inbox-welcome"><MessagesSquare size={40}/><h2>{ru ? "Все разговоры под рукой" : "Every conversation in reach"}</h2><p>{ru ? "Откройте диалог слева. Здесь будут сообщения, условия заказа и инструменты управления." : "Open a conversation on the left to see messages, order terms and controls."}</p><span>{ru ? "Отметка «Ответить» означает, что последнее сообщение написал клиент." : "The Reply label means the latest message is from the client."}</span></div>}</div>
+    </div>
+  </AccountShell>;
+}

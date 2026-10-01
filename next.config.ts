@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const development = process.env.NODE_ENV !== "production";
 const nextConfig: NextConfig = {
+  agentRules: false,
   poweredByHeader: false,
   serverExternalPackages: ["better-sqlite3"],
   experimental: { cpus: 1, webpackMemoryOptimizations: true },

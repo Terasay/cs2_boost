@@ -18,8 +18,9 @@ async function POSTHandler(request: Request) {
   if (!body || body.length > 2000) return privateJson({ error: "Message must be 1–2000 characters" }, 400);
   const retry = await chargeAttempt(await rateKey("message", null, user.id), 30, 5 * 60_000);
   if (retry) return privateJson({ error: "Too many messages. Try again later" }, 429, { "Retry-After": String(retry) });
-  await getDb().insert(messages).values({ id: crypto.randomUUID(), orderId: id, senderId: user.id, body, createdAt: Date.now() });
-  return privateJson({ ok: true }, 201);
+  const message = { id: crypto.randomUUID(), senderId: user.id, body, createdAt: Date.now() };
+  await getDb().insert(messages).values({ ...message, orderId: id });
+  return privateJson({ ok: true, message }, 201);
 }
 
 export const POST = safeApi(POSTHandler);

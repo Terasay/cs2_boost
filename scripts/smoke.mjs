@@ -119,6 +119,34 @@ for(const [path,count] of [[`/api/orders/${id}`,207],["/api/support",208]]){
   }while(cursor);
   assert.equal(seen.size,count,"Missing messages in paginated chat");
 }
+const sampleOrders = Array.from({length:130}, (_, index) => ({ id: crypto.randomUUID(), owner: index % 2 ? stranger.result.user.id : client.result.user.id, status: ["new","quoted","awaiting_payment","in_progress","completed","cancelled"][index % 6], platform: index % 3 ? "premier" : "faceit", time: Date.now() - (index + 1) * 60000 }));
+sql(sampleOrders.map((order,index) => `INSERT INTO orders (id,user_id,platform,service,method,current_rating,target_rating,status,quoted_price,quoted_currency,deadline,risk_accepted_at,created_at,updated_at) VALUES ('${order.id}','${order.owner}','${order.platform}','rating','${index % 2 ? "piloted" : "duo"}',${1000+index*50},${2000+index*50},'${order.status}',${order.status === "new" ? "NULL" : 5000+index*200},'KZT','2026-10-15',${order.time},${order.time},${order.time});`).join("\n"));
+const seenOrders = new Set();
+for (let page = 1; page <= 6; page++) {
+  const { result } = await call(`/api/orders?q=${nonce}&page=${page}`, { cookie: adminCookie });
+  assert.equal(result.total,131); assert.equal(result.page,page);
+  assert(result.orders.length <= 25);
+  for (const order of result.orders) { assert(!seenOrders.has(order.id)); seenOrders.add(order.id); }
+}
+assert.equal(seenOrders.size,131);
+const oldest = sampleOrders.at(-1);
+const olderSearch = await call(`/api/orders?q=${oldest.id}`, { cookie: adminCookie });
+assert.equal(olderSearch.result.orders[0].id,oldest.id);
+const privateSearch = await call(`/api/orders?q=${oldest.id}`, { cookie: clientCookie });
+assert.equal(privateSearch.result.total,0);
+const filtered = await call(`/api/orders?q=${nonce}&platform=faceit&status=in_progress`, { cookie: adminCookie });
+assert(filtered.result.orders.length > 0); assert(filtered.result.orders.every(order => order.platform === "faceit" && order.status === "in_progress"));
+const oldChat = await call(`/api/inbox?kind=orders&q=${oldest.id}`, { cookie: adminCookie });
+assert.equal(oldChat.result.total,1); assert.equal(oldChat.result.orderChats[0].id,oldest.id);
+await call('/api/orders?page=-1', { cookie: adminCookie, expected:400 });
+await call('/api/inbox?kind=other', { cookie: adminCookie, expected:400 });
+const sentMessage = await call(`/api/orders/${sampleOrders[0].id}/messages`, { method:"POST", cookie:clientCookie, body:{body:"Could we discuss the schedule?"}, expected:201 });
+assert.equal(sentMessage.result.message.body,"Could we discuss the schedule?");
+const waiting = await call(`/api/orders?q=${sampleOrders[0].id}&reply=1`, { cookie:adminCookie });
+assert.equal(waiting.result.total,1);
+await call(`/api/orders/${sampleOrders[0].id}/messages`, { method:"POST", cookie:adminCookie, body:{body:"Yes, let us agree on a time."}, expected:201 });
+const answered = await call(`/api/orders?q=${sampleOrders[0].id}&reply=1`, { cookie:adminCookie });
+assert.equal(answered.result.total,0);
 const changed = await call("/api/auth/password", { method: "POST", cookie: clientCookie, body: { currentPassword: password, newPassword } });
 if (!changed.cookie) throw new Error("Password change did not issue a new session");
 const expired = await call("/api/auth/me", { cookie: clientCookie });

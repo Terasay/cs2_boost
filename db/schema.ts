@@ -42,7 +42,7 @@ export const orders = sqliteTable("orders", {
   campaignContent: text("campaign_content"),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
-}, table => [index("orders_user_created_idx").on(table.userId, table.createdAt)]);
+}, table => [index("orders_user_created_idx").on(table.userId, table.createdAt), index("orders_created_idx").on(table.createdAt, table.id), index("orders_status_created_idx").on(table.status, table.createdAt, table.id)]);
 
 export const messages = sqliteTable("messages", {
   id: text("id").primaryKey(),
@@ -58,7 +58,7 @@ export const supportThreads = sqliteTable("support_threads", {
   status: text("status", { enum: ["open", "closed"] }).notNull().default("open"),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
-});
+}, table => [index("support_threads_updated_idx").on(table.updatedAt, table.id)]);
 
 export const supportMessages = sqliteTable("support_messages", {
   id: text("id").primaryKey(),

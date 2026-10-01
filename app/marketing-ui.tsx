@@ -31,7 +31,7 @@ export function MarketingHeader({ lang, slug = "" }: { lang: Language; slug?: st
 
 export function MarketingFooter({ lang }: { lang: Language }) {
   const text = commonCopy[lang];
-  return <footer className="marketing-footer"><div className="wrap marketing-footer-grid"><div><a href={`/${lang}`} className="brand">CS2<span>BOOST</span></a><p>{text.footer}</p><small>{text.independence}</small></div><nav aria-label={lang === "ru" ? "Услуги в подвале" : "Footer services"}>{serviceSlugs.map(slug => <a key={slug} href={`/${lang}/${slug}`}>{services[lang][slug].heading}</a>)}</nav><nav aria-label={text.support}><a href="/support">{text.support}</a><a href="/dashboard">{text.account}</a><a href={`/${lang}#calculator`}>{text.request} ↑</a></nav></div></footer>;
+  return <footer className="marketing-footer"><div className="wrap footer-cta"><div><span className="kicker">PREMIER / FACEIT</span><h2>{lang === "ru" ? "Следующий шаг — ваша цель." : "Your next step starts with a goal."}</h2></div><a href={`/${lang}#calculator`} className="compact-primary">{text.request}<ArrowRight size={17}/></a></div><div className="wrap marketing-footer-grid"><div><a href={`/${lang}`} className="brand">CS2<span>BOOST</span></a><p>{text.footer}</p><small>{text.independence}</small></div><nav aria-label={lang === "ru" ? "Услуги в подвале" : "Footer services"}><h3>{text.services}</h3>{serviceSlugs.map(slug => <a key={slug} href={`/${lang}/${slug}`}>{services[lang][slug].heading}</a>)}</nav><nav aria-label={text.support}><h3>{lang === "ru" ? "На связи" : "Get in touch"}</h3><a href="/support">{text.support}</a><a href="/dashboard">{text.account}</a><a href={`/${lang}#calculator`}>{text.request} ↑</a></nav></div></footer>;
 }
 
 export function FaqList({ items }: { items: Faq[] }) {

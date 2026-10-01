@@ -1,11 +1,12 @@
 import { ratingValue } from "@/lib/order-validation";
 import { cleanAttribution } from "@/lib/attribution.mjs";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { orders, users } from "@/db/schema";
 import { getCurrentUser } from "../auth/auth-lib";
 import { chargeAttempt, rateKey } from "../auth/rate-limit";
 import { jsonInput, privateJson, safeApi, sameOriginMutation } from "../request-security";
+import { listQuery, orderReply, searchCondition } from "../list-query";
 
 const fail = (error: string, status = 400) => privateJson({ error }, status);
 
@@ -13,15 +14,22 @@ async function GETHandler(request: Request) {
   const user = await getCurrentUser(request);
   if (!user) return fail("Sign in required", 401);
   const db = getDb();
+  const query = listQuery(request);
+  if (!query) return fail("Invalid filters");
+  const scope = user.role === "admin" ? undefined : eq(orders.userId, user.id);
+  const filter = and(scope, searchCondition(query.q, "order"), query.status ? eq(orders.status, query.status) : undefined, query.platform ? eq(orders.platform, query.platform) : undefined, query.reply ? sql`${orderReply} = 1` : undefined);
+  const [{ total }] = db.select({ total: sql<number>`count(*)` }).from(orders).innerJoin(users, eq(orders.userId, users.id)).where(filter).all();
+  const pages = Math.max(1, Math.ceil(total / query.pageSize));
+  const page = Math.min(query.page, pages);
+  const [summary] = db.select({ total: sql<number>`count(*)`, fresh: sql<number>`coalesce(sum(${orders.status} = 'new'), 0)`, active: sql<number>`coalesce(sum(${orders.status} = 'in_progress'), 0)`, waiting: sql<number>`coalesce(sum(${orderReply}), 0)` }).from(orders).where(scope).all();
   const all = await db.select({
     id: orders.id, platform: orders.platform, service: orders.service, method: orders.method,
     currentRating: orders.currentRating, targetRating: orders.targetRating, status: orders.status,
     quotedPrice: orders.quotedPrice, quotedCurrency: orders.quotedCurrency, deadline: orders.deadline,
-    createdAt: orders.createdAt, email: users.email,
+    createdAt: orders.createdAt, email: users.email, needsReply: orderReply,
   }).from(orders).innerJoin(users, eq(orders.userId, users.id))
-    .where(user.role === "admin" ? undefined : eq(orders.userId, user.id))
-    .orderBy(desc(orders.createdAt)).limit(100);
-  return privateJson({ orders: all });
+    .where(filter).orderBy(desc(orders.createdAt), desc(orders.id)).limit(query.pageSize).offset((page - 1) * query.pageSize);
+  return privateJson({ orders: all, total, page, pages, pageSize: query.pageSize, summary });
 }
 
 async function POSTHandler(request: Request) {

@@ -23,9 +23,9 @@ export function useLanguage() {
   return lang;
 }
 
-export function AccountShell({ children, back, backLabel }: { children: React.ReactNode; back?: string; backLabel?: string }) {
+export function AccountShell({ children, back, backLabel, workspace = false }: { children: React.ReactNode; back?: string; backLabel?: string; workspace?: boolean }) {
   const lang = useLanguage();
-  return <div className="account-page"><header className="account-header wrap"><a href={`/${lang}`} className="brand"><span className="brand-mark"><Crosshair size={22}/></span>CS2<span>BOOST</span></a><a href={back ?? `/${lang}`} className="account-back"><ArrowLeft size={17}/>{backLabel ?? (lang === "ru" ? "На главную" : "Home")}</a></header><main className="account-main wrap">{children}</main></div>;
+  return <div className={workspace ? "account-page workspace-shell" : "account-page"}><header className="account-header wrap"><a href={`/${lang}`} className="brand"><span className="brand-mark"><Crosshair size={22}/></span>CS2<span>BOOST</span></a><a href={back ?? `/${lang}`} className="account-back"><ArrowLeft size={17}/>{backLabel ?? (lang === "ru" ? "На главную" : "Home")}</a></header><main className="account-main wrap">{children}</main></div>;
 }
 
 export class ApiError extends Error {
