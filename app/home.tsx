@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 import { MarketingHeader, MarketingFooter, FaqList } from "./marketing-ui";
+import { PlayingMethods, AccountShowcase } from "./home-showcase";
 import { commonCopy, services, serviceSlugs, type Language as Lang } from "@/lib/marketing";
 type Platform = "premier" | "faceit";
 type Service = "rating" | "calibration";
@@ -110,10 +111,10 @@ export default function Home({ lang, initialPlatform = "premier", initialService
         </div>
       </section>
       <section className="content-block alt" id="services"><div className="wrap"><span className="kicker">{t.services.toUpperCase()}</span><h2>{t.serviceTitle}</h2><div className="cards">{serviceSlugs.map((slug,index)=><article key={slug}><span>0{index+1}</span><Crosshair/><h3>{services[lang][slug].heading}</h3><p>{services[lang][slug].intro}</p><a className="service-text-link" href={`/${lang}/${slug}`}>{commonCopy[lang].more}<ArrowRight size={16}/></a></article>)}</div></div></section>
-      <section className="content-block" id="process"><div className="wrap"><span className="kicker">{t.process.toUpperCase()}</span><h2>{t.processTitle}</h2><div className="steps"><div><strong>01</strong><h3>{t.p1}</h3><p>{t.p1d}</p></div><div><strong>02</strong><h3>{t.p2}</h3><p>{t.p2d}</p></div><div><strong>03</strong><h3>{t.p3}</h3><p>{t.p3d}</p></div></div></div></section>
+      <PlayingMethods lang={lang} selected={method} onSelect={value => { setMethod(value); document.getElementById("calculator")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" }); }}/>
+      <AccountShowcase lang={lang}/>
       <section className="content-block alt" id="faq"><div className="wrap faq-layout"><div><span className="kicker">FAQ</span><h2>{t.faqTitle}</h2></div><FaqList items={[{question:t.q1,answer:t.a1},{question:t.q2,answer:t.a2},{question:t.q3,answer:t.a3},...commonCopy[lang].questions]}/></div></section>
     </main>
     <MarketingFooter lang={lang}/>
   </div>;
 }
-
