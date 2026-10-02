@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdirSync, mkdtempSync, readdirSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync, copyFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 
 test("fresh migrations, admin promotion, and consistent database backup", () => {
   mkdirSync("work", { recursive: true });
@@ -36,4 +38,31 @@ test("fresh migrations, admin promotion, and consistent database backup", () => 
       assert.equal(restored.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, 8);
     } finally { restored.close(); }
   } finally { database.close(); }
+});
+
+test("existing orders retain historical currency, amount and deadline during migration", () => {
+  const directory = mkdtempSync(resolve("work/upgrade-test-"));
+  const previous = join(directory, "previous"); mkdirSync(join(previous,"meta"),{recursive:true});
+  const journal=JSON.parse(readFileSync("drizzle/meta/_journal.json","utf8"));journal.entries=journal.entries.slice(0,7);
+  writeFileSync(join(previous,"meta/_journal.json"),JSON.stringify(journal));
+  for(const entry of journal.entries)copyFileSync(`drizzle/${entry.tag}.sql`,join(previous,`${entry.tag}.sql`));
+  const database = new Database(join(directory,"database.sqlite"));
+  try {
+    migrate(drizzle(database),{migrationsFolder:previous});
+    const now=Date.now();const userId=crypto.randomUUID();
+    database.prepare("INSERT INTO users(id,email,password_hash,created_at) VALUES(?,?,?,?)").run(userId,"existing@example.test","test-only",now);
+    const ids=[];
+    for(const status of ["new","quoted","awaiting_payment","in_progress","completed","cancelled"]) {
+      const id=crypto.randomUUID();ids.push(id);
+      database.prepare("INSERT INTO orders(id,user_id,platform,service,method,current_rating,target_rating,status,quoted_price,quoted_currency,deadline,risk_accepted_at,created_at,updated_at) VALUES(?,?,'premier','rating','duo',4000,6000,?,5000,'KZT','2026-10-15',?,?,?)").run(id,userId,status,now,now,now);
+    }
+    migrate(drizzle(database),{migrationsFolder:resolve("drizzle")});
+    for(const id of ids) {
+      const order=database.prepare("SELECT * FROM orders WHERE id=?").get(id);
+      assert.equal(order.quoted_price,5000);assert.equal(order.quoted_currency,"KZT");assert.equal(order.deadline,"2026-10-15");
+      assert.equal(order.total_amount,500000);assert.equal(order.duration_days,2);assert.equal(order.paid_at,null);assert.equal(order.started_at,null);
+      if(order.status === "quoted"){assert.equal(order.proposal_amount,500000);assert.equal(order.proposal_days,2);}
+    }
+    assert.equal(database.pragma("foreign_key_check").length,0);
+  } finally {database.close();}
 });

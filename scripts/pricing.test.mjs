@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { calculatePrice, normalizePromo } from "../lib/pricing.mjs";
@@ -55,6 +55,7 @@ test("credentials cannot be read from the database, moved between orders, or mod
 });
 
 test("deployment creates the encryption key once and preserves email configuration", () => {
+  mkdirSync("work", { recursive: true });
   const dir=mkdtempSync(resolve("work/access-key-test-"));const file=join(dir,"server.env");
   const source="APP_ORIGIN=https://cs2-boosts.ru\nRESEND_API_KEY=re_placeholder_test_only\nORDER_ACCESS_KEY=\n";
   writeFileSync(file,source);

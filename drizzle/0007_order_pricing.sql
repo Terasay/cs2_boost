@@ -52,3 +52,5 @@ ALTER TABLE `orders` ADD `proposal_reason` text;--> statement-breakpoint
 UPDATE orders SET total_amount = quoted_price * 100, initial_total_amount = quoted_price * 100 WHERE quoted_price IS NOT NULL;
 --> statement-breakpoint
 UPDATE orders SET duration_days = max(1, (target_rating - current_rating + CASE WHEN platform = 'premier' THEN 999 ELSE 99 END) / CASE WHEN platform = 'premier' THEN 1000 ELSE 100 END), standard_days = max(1, (target_rating - current_rating + CASE WHEN platform = 'premier' THEN 999 ELSE 99 END) / CASE WHEN platform = 'premier' THEN 1000 ELSE 100 END) WHERE service = 'rating' AND target_rating > current_rating;
+--> statement-breakpoint
+UPDATE orders SET proposal_amount = total_amount, proposal_days = coalesce(duration_days, 1), proposal_reason = 'Условия ранее оформленной заявки' WHERE status = 'quoted' AND total_amount IS NOT NULL;

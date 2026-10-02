@@ -18,6 +18,7 @@ const migration=spawnSync(process.execPath,["scripts/migrate.mjs"],{env,encoding
 const db=new Database(dbPath);db.pragma("foreign_keys=ON");
 const server=spawn(process.execPath,["node_modules/next/dist/bin/next","start","--hostname","127.0.0.1","--port",String(port)],{env,stdio:["ignore","pipe","pipe"],windowsHide:true});
 let logs="";server.stdout.on("data",value=>logs+=value);server.stderr.on("data",value=>logs+=value);
+let keepServer = false;
 const password="OrderSmokePassword_2026";
 async function call(path,cookie="",body,expected=200,method=body?"POST":"GET",origin=base){
   const response=await fetch(base+path,{method,headers:{Origin:origin,"Content-Type":"application/json",Cookie:cookie},body:body?JSON.stringify(body):undefined});
@@ -84,5 +85,8 @@ try {
   report=(await call("/api/promos",admin.cookie)).data;assert.equal(report.codes.find(code=>code.code === "Terasay").earned,24000);
   const full=spawnSync(process.execPath,["scripts/smoke.mjs"],{env:{...env,SITE_TEST_URL:base,SITE_TEST_ORIGIN:base},encoding:"utf8"});assert.equal(full.status,0,full.stderr || full.stdout);
   console.log(JSON.stringify({ok:true,frozenPricing:true,manualPayment:true,concurrentPayment:true,singleEarning:true,encryptedAccess:true,roleIsolation:true,stableTimer:true,transparentOffers:true,refundReversal:true,calibration:true,existingSmoke:true}));
-  if(process.env.SITE_KEEP_FIXTURES === "1")writeFileSync("work/order-ui-fixture.json",JSON.stringify({base,dbPath,clientEmail:client.email,adminEmail:admin.email,password,orderId:proposedId,encryptionKey:env.ORDER_ACCESS_KEY}));
-}catch(error){console.error(logs.slice(-4000));throw error;}finally{if(process.env.SITE_KEEP_FIXTURES !== "1"){server.kill();db.close();await new Promise(resolve=>server.once("exit",resolve));}}
+  if(process.env.SITE_KEEP_FIXTURES === "1"){
+    writeFileSync("work/order-ui-fixture.json",JSON.stringify({base,dbPath,clientEmail:client.email,adminEmail:admin.email,password,orderId:proposedId,encryptionKey:env.ORDER_ACCESS_KEY}));
+    keepServer = true;
+  }
+}catch(error){console.error(logs.slice(-4000));throw error;}finally{if(!keepServer){db.close();if(server.exitCode === null){const exited=new Promise(resolve=>server.once("exit",resolve));server.kill();await exited;}}}
