@@ -62,30 +62,6 @@ export default function Home({ lang, initialPlatform = "premier", initialService
   let price: Price | null = null;
   try { if(service === "calibration" || (current && target))price = calculatePrice({platform,service,current:Number(current),target:Number(target),redTrust:platform === "premier" && redTrust,promoCode}); } catch {}
   useEffect(()=>{
-    type Context = { registerTool: (tool: { name:string; title:string; description:string; inputSchema:object; annotations:{readOnlyHint:boolean}; execute:(input:unknown)=>Promise<unknown> }, options:{signal:AbortSignal})=>void|Promise<void> };
-    const context=(document as Document & {modelContext?:Context}).modelContext;
-    if(!context?.registerTool)return;
-    const lifecycle=new AbortController();
-    void Promise.resolve(context.registerTool({
-      name:"configure_boost_request",
-      title:"Configure CS2 boost request",
-      description:"Set the visible Premier or FACEIT request form. This stages a request; it does not create an order.",
-      inputSchema:{type:"object",properties:{platform:{type:"string",enum:["premier","faceit"]},service:{type:"string",enum:["rating","calibration"]},method:{type:"string",enum:["duo","piloted"]},current:{type:"integer",minimum:0},target:{type:"integer",minimum:1}},required:["platform","service","method"],additionalProperties:false},
-      annotations:{readOnlyHint:false},
-      async execute(input){
-        if(!input||typeof input!=="object")throw new Error("Invalid request options");
-        const value=input as Record<string,unknown>;
-        if((value.platform!=="premier"&&value.platform!=="faceit")||(value.service!=="rating"&&value.service!=="calibration")||(value.method!=="duo"&&value.method!=="piloted"))throw new Error("Invalid request options");
-        if(value.service==="rating"&&(!Number.isInteger(value.current)||!Number.isInteger(value.target)||Number(value.current)<0||Number(value.target)<=Number(value.current)||Number(value.target)>100000))throw new Error("Valid current and target ratings are required");
-        setPlatform(value.platform);setService(value.service);setMethod(value.method);
-        setCurrent(value.service==="rating"?String(value.current):"");setTarget(value.service==="rating"?String(value.target):"");setError("");
-        document.getElementById("calculator")?.scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"instant":"smooth",block:"start"});
-        return {staged:true,platform:value.platform,service:value.service,method:value.method,current:value.service==="rating"?value.current:null,target:value.service==="rating"?value.target:null};
-      }
-    },{signal:lifecycle.signal})).catch(()=>{});
-    return()=>lifecycle.abort();
-  },[]);
-  useEffect(()=>{
     if(window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;
     const elements=document.querySelectorAll<HTMLElement>(".content-block h2,.cards article,.steps>div,.faq-layout>div");
     const observer=new IntersectionObserver(entries=>{for(const entry of entries){if(entry.isIntersecting){entry.target.classList.add("is-visible");observer.unobserve(entry.target)}}},{threshold:.12,rootMargin:"0px 0px -35px 0px"});
