@@ -125,6 +125,22 @@ for(const [path,count] of [[`/api/orders/${id}`,207],["/api/support",208]]){
   }while(cursor);
   assert.equal(seen.size,count,"Missing messages in paginated chat");
 }
+for (const path of [`/api/orders/${id}`, "/api/support"]) {
+  const seen = new Set();
+  let cursor = `${rows[0].time}:${rows[0].id}`;
+  let more;
+  do {
+    const { result } = await call(`${path}?after=${encodeURIComponent(cursor)}`, { cookie: clientCookie });
+    assert(result.messages.length <= 50);
+    for (const message of result.messages) { assert(!seen.has(message.id)); seen.add(message.id); }
+    assert.notEqual(result.latestCursor, cursor);
+    cursor = result.latestCursor;
+    more = result.hasMore;
+  } while (more);
+  assert.equal(seen.size, 204, "Messages missing after reconnecting to chat");
+  await call(`${path}?after=invalid`, { cookie: clientCookie, expected: 400 });
+  await call(`${path}?after=${encodeURIComponent(cursor)}&before=${encodeURIComponent(cursor)}`, { cookie: clientCookie, expected: 400 });
+}
 const sampleOrders = Array.from({length:130}, (_, index) => ({ id: crypto.randomUUID(), owner: index % 2 ? stranger.result.user.id : client.result.user.id, status: ["new","quoted","awaiting_payment","in_progress","completed","cancelled"][index % 6], platform: index % 3 ? "premier" : "faceit", time: Date.now() - (index + 1) * 60000 }));
 sql(sampleOrders.map((order,index) => `INSERT INTO orders (id,user_id,platform,service,method,current_rating,target_rating,status,quoted_price,quoted_currency,deadline,risk_accepted_at,created_at,updated_at) VALUES ('${order.id}','${order.owner}','${order.platform}','rating','${index % 2 ? "piloted" : "duo"}',${1000+index*50},${2000+index*50},'${order.status}',${order.status === "new" ? "NULL" : 5000+index*200},'KZT','2026-10-15',${order.time},${order.time},${order.time});`).join("\n"));
 const seenOrders = new Set();
@@ -144,13 +160,24 @@ const filtered = await call(`/api/orders?q=${nonce}&platform=faceit&status=in_pr
 assert(filtered.result.orders.length > 0); assert(filtered.result.orders.every(order => order.platform === "faceit" && order.status === "in_progress"));
 const oldChat = await call(`/api/inbox?kind=orders&q=${oldest.id}`, { cookie: adminCookie });
 assert.equal(oldChat.result.total,1); assert.equal(oldChat.result.orderChats[0].id,oldest.id);
+const mixedChats = await call(`/api/inbox?kind=all&q=${encodeURIComponent(clientEmail)}`, { cookie: adminCookie });
+assert.equal(mixedChats.result.totals.orders,66);
+assert.equal(mixedChats.result.totals.support,1);
+assert.equal(mixedChats.result.total,67);
+assert.equal(mixedChats.result.pages,3);
 await call('/api/orders?page=-1', { cookie: adminCookie, expected:400 });
 await call('/api/inbox?kind=other', { cookie: adminCookie, expected:400 });
 const sentMessage = await call(`/api/orders/${sampleOrders[0].id}/messages`, { method:"POST", cookie:clientCookie, body:{body:"Could we discuss the schedule?"}, expected:201 });
 assert.equal(sentMessage.result.message.body,"Could we discuss the schedule?");
+assert.equal(sentMessage.result.message.senderRole,"client");
 const waiting = await call(`/api/orders?q=${sampleOrders[0].id}&reply=1`, { cookie:adminCookie });
 assert.equal(waiting.result.total,1);
-await call(`/api/orders/${sampleOrders[0].id}/messages`, { method:"POST", cookie:adminCookie, body:{body:"Yes, let us agree on a time."}, expected:201 });
+const adminReply = await call(`/api/orders/${sampleOrders[0].id}/messages`, { method:"POST", cookie:adminCookie, body:{body:"Yes, let us agree on a time."}, expected:201 });
+assert.equal(adminReply.result.message.senderRole,"admin");
+assert(adminReply.result.message.createdAt > sentMessage.result.message.createdAt);
+const labelledChat = await call(`/api/orders/${sampleOrders[0].id}`, { cookie:clientCookie });
+assert.equal(labelledChat.result.messages.at(-1).senderRole,"admin");
+assert.equal(labelledChat.result.messages.at(-1).senderEmail,undefined);
 const answered = await call(`/api/orders?q=${sampleOrders[0].id}&reply=1`, { cookie:adminCookie });
 assert.equal(answered.result.total,0);
 const changed = await call("/api/auth/password", { method: "POST", cookie: clientCookie, body: { currentPassword: password, newPassword } });

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { readStorage, writeStorage } from "@/lib/browser-storage";
 import { calculatePrice, type Price } from "@/lib/pricing.mjs";
 import { PriceSummary, PromoInput } from "./price-summary";
-import { api } from "./account-ui";
+import { api, readDraft } from "./account-ui";
 import Image from "next/image";
 import { ArrowRight, Crosshair, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -58,9 +58,24 @@ export default function Home({ lang, initialPlatform = "premier", initialService
   const [signedIn,setSignedIn]=useState(false);
   useEffect(()=>{let active=true;void api<{user:unknown}>("/api/auth/me").then(result=>{if(active)setSignedIn(Boolean(result.user))}).catch(()=>{});return()=>{active=false}},[]);
   const t=words[lang];
-  useEffect(()=>{const query = new URLSearchParams(window.location.search).get("promo"); const timer=setTimeout(()=>{setPromoCode(query ?? readStorage("sessionStorage","cs2-promo") ?? ""); if(query !== null)writeStorage("sessionStorage","cs2-promo",query.slice(0,32));},0);return()=>clearTimeout(timer)},[]);
+  useEffect(()=>{
+    const query = new URLSearchParams(window.location.search);
+    const promo = query.get("promo");
+    const timer = setTimeout(()=>{
+      const draft = query.get("resume") === "1" ? readDraft() : null;
+      if (draft) {
+        setPlatform(draft.platform);setService(draft.service);setMethod(draft.method);
+        setCurrent(draft.current === null ? "" : String(draft.current));setTarget(draft.target === null ? "" : String(draft.target));setRedTrust(draft.redTrust === true);
+      }
+      setPromoCode(promo?.slice(0,32) ?? draft?.promoCode ?? readStorage("sessionStorage","cs2-promo") ?? "");
+      if (promo !== null) writeStorage("sessionStorage","cs2-promo",promo.slice(0,32));
+    },0);
+    return()=>clearTimeout(timer);
+  },[]);
   let price: Price | null = null;
-  try { if(service === "calibration" || (current && target))price = calculatePrice({platform,service,current:Number(current),target:Number(target),redTrust:platform === "premier" && redTrust,promoCode}); } catch {}
+  let priceProblem = "";
+  try { if(service === "calibration" || (current && target))price = calculatePrice({platform,service,current:Number(current),target:Number(target),redTrust:platform === "premier" && redTrust,promoCode}); }
+  catch(reason) { priceProblem = reason instanceof Error && reason.message === "Unknown promo code" ? (lang === "ru" ? "Исправьте промокод или удалите его, чтобы рассчитать стоимость." : "Correct or remove the promo code to calculate the price.") : t.invalid; }
   useEffect(()=>{
     if(window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;
     const elements=document.querySelectorAll<HTMLElement>(".content-block h2,.cards article,.steps>div,.faq-layout>div");
@@ -91,7 +106,7 @@ export default function Home({ lang, initialPlatform = "premier", initialService
             {platform === "premier" && <label className="trust-check"><input type="checkbox" checked={redTrust} onChange={event=>setRedTrust(event.target.checked)}/><span>{lang === "ru" ? "На аккаунте красный траст · +10%" : "Red trust on this account · +10%"}</span></label>}
             <p className="tariff-note">{platform === "premier" ? (lang === "ru" ? "500 ₽ / 1 000 рейтинга. При исходном рейтинге выше 10 000 — 700 ₽." : "500 RUB / 1,000 rating. Starting above 10,000: 700 RUB.") : (lang === "ru" ? "500 ₽ / 100 ELO. При исходном ELO выше 1 200 — 700 ₽." : "500 RUB / 100 ELO. Starting above 1,200: 700 RUB.")}<br/>{lang === "ru" ? "Неполный шаг оплачивается пропорционально; срок округляется до целого дня." : "Partial steps are priced proportionally; delivery time rounds up to a whole day."}</p>
             <PromoInput value={promoCode} onChange={value=>{setPromoCode(value);writeStorage("sessionStorage","cs2-promo",value)}} ru={lang === "ru"}/>
-            <PriceSummary price={price} ru={lang === "ru"}/>
+            <PriceSummary price={price} ru={lang === "ru"} problem={priceProblem}/>
             {error&&<p className="error" role="alert">{error}</p>}
             <Button className="continue-button" onClick={next}>{t.continue}<ArrowRight size={19}/></Button><p className="under-button">{signedIn?(lang==="ru"?"Заявка сохранится в личном кабинете":"Your request will be saved in your account"):t.accountLater}</p>
           </div>

@@ -2,3 +2,7 @@
 @media(max-width:900px){.order-flow{gap:0}.order-flow li{font-size:11px;padding:11px 8px;gap:6px}.promo-owner-grid{grid-template-columns:1fr}.order-workspace .order-inspector{max-height:none}.order-workspace .inspector-body{display:block}.order-flow li>span{width:18px;height:18px}.workspace-nav{flex-wrap:wrap}}
 @media(max-width:650px){.order-flow li{flex-direction:column;text-align:center;gap:6px;padding:11px 5px;font-size:9px}.orders-table td:nth-child(4){display:block;grid-column:1;grid-row:3;color:#edbe86}.orders-table td:nth-child(5){display:block;grid-column:2;grid-row:3;max-width:140px;font-size:11px;text-align:right}.orders-table td:nth-child(5)>small{display:none}.promo-owner-card{padding:20px}.price-total strong{font-size:22px}.order-flow{margin-bottom:15px}.inbox-detail .order-workspace .order-inspector{max-height:none}}
 @media(prefers-reduced-motion:reduce){.secondary-action,.danger-action{transition:none}}
+.price-summary .price-problem{color:#ffc185}
+.order-inspector>summary{position:sticky;top:0;z-index:1;background:#111d2d}
+.order-inspector:not([open]){align-self:start}
+.inspector-price{display:block;margin-top:5px;color:#ffb860;font-size:12px;font-weight:600}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, ArrowUpRight, ChevronDown } from "lucide-react";
 import { AccountShell, api, statusLabels, useLanguage } from "./account-ui";
 import { ConversationPanel } from "./conversation-panel";
@@ -20,6 +20,11 @@ export default function OrderWorkspace({ id, embedded = false, onActivity }: { i
   const order = data?.order;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [inspectorOpen, setInspectorOpen] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setInspectorOpen(!window.matchMedia("(max-width: 760px)").matches), 0);
+    return () => clearTimeout(timer);
+  }, []);
   const total = order?.totalAmount ?? (order?.quotedPrice === null || !order ? null : order.quotedPrice * 100);
   const currency = order?.quotedCurrency || (order?.pricingVersion ? "RUB" : "KZT");
   async function run(action: string, values: Record<string, unknown> = {}) {
@@ -33,9 +38,9 @@ export default function OrderWorkspace({ id, embedded = false, onActivity }: { i
   }
   function sent(message?: ChatMessage) { if (message) update(value => ({ ...value, messages: [...value.messages.filter(item => item.id !== message.id), message] })); void reload(); onActivity?.(); }
   const content = <div className={embedded ? "order-workspace embedded" : "order-workspace"}>
-    <header className="order-workspace-heading"><div><span className="kicker">{ru ? "ЗАКАЗ" : "ORDER"} / #{id.slice(0, 8).toUpperCase()}</span><h1>{order ? `${order.platform.toUpperCase()} · ${order.service === "rating" ? (ru ? "Буст рейтинга" : "Rating boost") : (ru ? "Калибровка" : "Calibration")}` : (ru ? "Загрузка заказа…" : "Loading order…")}</h1><p>{order?.clientEmail}</p></div>{order && <div className="order-workspace-badges"><span className={`status status-${order.status}`}>{statusLabels[order.status]?.[lang] || order.status}</span>{embedded && <a className="icon-button" href={`/orders/${id}`} aria-label={ru ? "Открыть полный заказ" : "Open full order"}><ArrowUpRight size={18}/></a>}</div>}</header>
+    <header className="order-workspace-heading"><div><span className="kicker">{ru ? "ЗАКАЗ" : "ORDER"} / #{id.slice(0, 8).toUpperCase()}</span><h1>{order ? `${order.platform.toUpperCase()} · ${order.service === "rating" ? (ru ? "Буст рейтинга" : "Rating boost") : (ru ? "Калибровка" : "Calibration")}` : resource.error ? (ru ? "Заказ недоступен" : "Order unavailable") : (ru ? "Загрузка заказа…" : "Loading order…")}</h1><p>{order?.clientEmail}</p></div>{order && <div className="order-workspace-badges"><span className={`status status-${order.status}`}>{statusLabels[order.status]?.[lang] || order.status}</span>{embedded && <a className="icon-button" href={`/orders/${id}`} aria-label={ru ? "Открыть полный заказ" : "Open full order"}><ArrowUpRight size={18}/></a>}</div>}</header>
     {(resource.error || error) && <p className="error" role="alert">{error || resource.error}</p>}
-    {data && order && <><ol className="order-flow">{(ru ? ["Заявка","Принятие","Оплата","Данные","Выполнение"] : ["Request","Accepted","Payment","Details","Delivery"]).map((label,index)=>{const stage=order.status === "completed" ? 5 : order.status === "in_progress" || order.startedAt ? 4 : order.paidAt ? 3 : order.status === "awaiting_payment" ? 2 : order.status === "quoted" ? 1 : 0;return <li key={label} className={order.status === "cancelled" ? "" : index <= stage ? "done" : ""}><span>{index+1}</span>{label}</li>})}</ol><div className="order-workspace-grid"><details className="order-inspector" open><summary>{ru ? "Условия и управление" : "Terms and management"}<ChevronDown size={17}/></summary><div className="inspector-body"><div className="rating-summary"><span>{order.service === "rating" ? (ru ? "Рейтинг" : "Rating") : (ru ? "Услуга" : "Service")}</span>{order.service === "rating" ? <strong>{order.currentRating?.toLocaleString()}<ArrowRight size={18}/>{order.targetRating?.toLocaleString()}</strong> : <strong>{ru ? "Калибровка" : "Calibration"}</strong>}<small>{order.method === "duo" ? (ru ? "Игра вместе" : "Duo play") : (ru ? "На аккаунте" : "Piloted play")}</small></div>
+    {data && order && <><ol className="order-flow">{(ru ? ["Заявка","Принятие","Оплата","Данные","Выполнение"] : ["Request","Accepted","Payment","Details","Delivery"]).map((label,index)=>{const stage=order.status === "completed" ? 5 : order.status === "in_progress" || order.startedAt ? 4 : order.paidAt ? 3 : order.status === "awaiting_payment" ? 2 : order.status === "quoted" ? 1 : 0;return <li key={label} className={order.status === "cancelled" ? "" : index <= stage ? "done" : ""}><span>{index+1}</span>{label}</li>})}</ol><div className="order-workspace-grid"><details className="order-inspector" open={inspectorOpen} onToggle={event=>setInspectorOpen(event.currentTarget.open)}><summary><span>{ru ? "Условия и управление" : "Terms and management"}{!inspectorOpen && <small className="inspector-price">{total === null ? (ru ? "На согласовании" : "Pending agreement") : money(total,lang,currency)}</small>}</span><ChevronDown size={17}/></summary><div className="inspector-body"><div className="rating-summary"><span>{order.service === "rating" ? (ru ? "Рейтинг" : "Rating") : (ru ? "Услуга" : "Service")}</span>{order.service === "rating" ? <strong>{order.currentRating?.toLocaleString()}<ArrowRight size={18}/>{order.targetRating?.toLocaleString()}</strong> : <strong>{ru ? "Калибровка" : "Calibration"}</strong>}<small>{order.method === "duo" ? (ru ? "Игра вместе" : "Duo play") : (ru ? "На аккаунте" : "Piloted play")}</small></div>
       <dl className="compact-terms">
         {order.baseAmount !== null && <div><dt>{ru ? "Базовая стоимость" : "Base price"}</dt><dd>{money(order.baseAmount,lang,currency)}</dd></div>}
         {order.redTrust && <div><dt>{ru ? "Красный траст · +10%" : "Red trust · +10%"}</dt><dd>{money(order.surchargeAmount,lang,currency)}</dd></div>}

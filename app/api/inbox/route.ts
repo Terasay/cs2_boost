@@ -17,8 +17,8 @@ export const GET = safeApi(async request => {
   const supportFilter = and(searchCondition(query.q, "support"), query.reply ? sql`${supportReply} = 1` : undefined);
   const [{ total: orderTotal }] = db.select({ total: sql<number>`count(*)` }).from(orders).innerJoin(users, eq(orders.userId, users.id)).where(orderFilter).all();
   const [{ total: supportTotal }] = db.select({ total: sql<number>`count(*)` }).from(supportThreads).innerJoin(users, eq(supportThreads.userId, users.id)).where(supportFilter).all();
-  const total = kind === "support" ? supportTotal : orderTotal;
-  const pages = Math.max(1, Math.ceil(total / query.pageSize));
+  const total = kind === "support" ? supportTotal : kind === "orders" ? orderTotal : orderTotal + supportTotal;
+  const pages = Math.max(1, Math.ceil((kind === "all" ? Math.max(orderTotal, supportTotal) : total) / query.pageSize));
   const page = Math.min(query.page, pages);
   const offset = (page - 1) * query.pageSize;
   const orderChats = kind === "support" ? [] : db.select({

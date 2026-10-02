@@ -3,8 +3,8 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { api } from "./account-ui";
 
-export type ChatMessage = { id: string; senderId: string; body: string; createdAt: number };
-export type ChatPage = { messages: ChatMessage[]; nextCursor: string | null };
+import type { ChatPage } from "@/lib/chat-sync";
+export type { ChatMessage, ChatPage } from "@/lib/chat-sync";
 
 export function ChatHistory({ endpoint, page, currentUserId, role, lang, empty }: { endpoint: string; page: ChatPage; currentUserId: string; role: "client" | "admin"; lang: "ru" | "en"; empty: React.ReactNode }) {
   const [history, setHistory] = useState<ChatPage | null>(null);
@@ -42,6 +42,6 @@ export function ChatHistory({ endpoint, page, currentUserId, role, lang, empty }
   return <div className="chat-history"><div className="messages" ref={box} role="log" aria-label={ru ? "История сообщений" : "Message history"} onScroll={() => { const element = box.current; if (element) { nearBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80; setAtBottom(nearBottom.current); } }}>
     {cursor && <button className="history-button" type="button" disabled={busy} onClick={older}>{busy ? (ru ? "Загружаем…" : "Loading…") : (ru ? "Предыдущие сообщения" : "Earlier messages")}</button>}
     {error && <p className="error" role="alert">{error}</p>}
-    {merged.length ? merged.map(message => <div key={message.id} className={message.senderId === currentUserId ? "message mine" : "message"}><small>{message.senderId === currentUserId ? (ru ? "Вы" : "You") : role === "admin" ? (ru ? "Клиент" : "Client") : (ru ? "Администратор" : "Admin")} · {new Date(message.createdAt).toLocaleString(ru ? "ru-RU" : "en-US")}</small><p>{message.body}</p></div>) : empty}
+    {merged.length ? merged.map(message => <div key={message.id} className={message.senderId === currentUserId ? "message mine" : "message"}><small>{message.senderId === currentUserId ? (ru ? "Вы" : "You") : message.senderRole === "admin" ? (ru ? "Администратор" : "Admin") : message.senderRole === "client" || role === "admin" ? (ru ? "Клиент" : "Client") : (ru ? "Администратор" : "Admin")} · {new Date(message.createdAt).toLocaleString(ru ? "ru-RU" : "en-US")}</small><p>{message.body}</p></div>) : empty}
   </div>{!atBottom && <button type="button" className="jump-latest" onClick={() => { box.current?.scrollTo({ top: box.current.scrollHeight, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); }}>{ru ? "К последним сообщениям ↓" : "Latest messages ↓"}</button>}</div>;
 }

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, Crosshair } from "lucide-react";
 import { readStorage } from "@/lib/browser-storage";
 import { ratingValue } from "@/lib/order-validation";
-import { normalizePromo } from "@/lib/pricing.mjs";
 
 export type User = { id: string; email: string; role: "client" | "admin" };
 export type Draft = { platform: "premier" | "faceit"; service: "rating" | "calibration"; method: "duo" | "piloted"; current: number | null; target: number | null; redTrust?: boolean; promoCode?: string | null };
@@ -14,7 +13,7 @@ export function readDraft(): Draft | null {
     const value = JSON.parse(readStorage("sessionStorage", "cs2-draft") ?? "null");
     if (!value || !["premier", "faceit"].includes(value.platform) || !["rating", "calibration"].includes(value.service) || !["duo", "piloted"].includes(value.method)) return null;
     if (value.service === "rating" && (ratingValue(value.current) === null || ratingValue(value.target) === null || value.target <= value.current)) return null;
-    return { platform: value.platform, service: value.service, method: value.method, current: value.current, target: value.target, redTrust: value.platform === "premier" && value.redTrust === true, promoCode: normalizePromo(value.promoCode) };
+    return { platform: value.platform, service: value.service, method: value.method, current: value.current, target: value.target, redTrust: value.platform === "premier" && value.redTrust === true, promoCode: typeof value.promoCode === "string" && value.promoCode.length <= 32 ? value.promoCode : null };
   } catch { return null; }
 }
 

@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { messages, orders } from "@/db/schema";
+import { orders } from "@/db/schema";
+import { saveChatMessage } from "../../../chat-history";
 import { getCurrentUser } from "../../../auth/auth-lib";
 import { chargeAttempt, rateKey } from "../../../auth/rate-limit";
 import { jsonInput, privateJson, safeApi, sameOriginMutation } from "../../../request-security";
@@ -18,8 +19,7 @@ async function POSTHandler(request: Request) {
   if (!body || body.length > 2000) return privateJson({ error: "Message must be 1–2000 characters" }, 400);
   const retry = await chargeAttempt(await rateKey("message", null, user.id), 30, 5 * 60_000);
   if (retry) return privateJson({ error: "Too many messages. Try again later" }, 429, { "Retry-After": String(retry) });
-  const message = { id: crypto.randomUUID(), senderId: user.id, body, createdAt: Date.now() };
-  await getDb().insert(messages).values({ ...message, orderId: id });
+  const message = saveChatMessage("order", id, user.id, body);
   return privateJson({ ok: true, message }, 201);
 }
 

@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { supportMessages, supportThreads } from "@/db/schema";
+import { supportThreads } from "@/db/schema";
+import { saveChatMessage } from "../../../chat-history";
 import { getCurrentUser } from "../../../auth/auth-lib";
 import { chargeAttempt, rateKey } from "../../../auth/rate-limit";
 import { jsonInput, privateJson, safeApi, sameOriginMutation } from "../../../request-security";
@@ -21,12 +22,7 @@ async function POSTHandler(request: Request) {
   if (!body || body.length > 2000) return fail("Message must be 1–2000 characters");
   const retry = await chargeAttempt(await rateKey("support-message", null, user.id), 30, 5 * 60_000);
   if (retry) return privateJson({ error: "Too many messages. Try again later" }, 429, { "Retry-After": String(retry) });
-  const now = Date.now();
-  const message = { id: crypto.randomUUID(), senderId: user.id, body, createdAt: now };
-  db.transaction(tx => {
-    tx.insert(supportMessages).values({ ...message, threadId: id }).run();
-    tx.update(supportThreads).set({ status: "open", updatedAt: now }).where(eq(supportThreads.id, id)).run();
-  });
+  const message = saveChatMessage("support", id, user.id, body);
   return privateJson({ ok: true, message }, 201);
 }
 

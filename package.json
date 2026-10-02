@@ -16,6 +16,7 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "test:security": "node --test scripts/security.test.mjs",
+    "test:chat": "node --test scripts/chat.test.mjs",
     "test:pricing": "node --test scripts/pricing.test.mjs",
     "test:orders": "node scripts/order-smoke.mjs",
     "test:mail": "node --test scripts/mail.test.mjs",

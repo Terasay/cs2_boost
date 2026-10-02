@@ -34,6 +34,11 @@ for (const path of ["/account", "/dashboard", "/analytics", "/login", "/register
 const redirect = await fetch(base + "/?utm_source=telegram&utm_campaign=launch", { redirect: "manual" });
 assert.equal(redirect.status, 308);
 assert.equal(redirect.headers.get("location"), "/ru?utm_source=telegram&utm_campaign=launch");
+for (const code of ["Cherep", "Terasay"]) {
+  const promoRedirect = await fetch(`${base}/?promo=${code}`, { redirect: "manual" });
+  assert.equal(promoRedirect.status, 308);
+  assert.equal(promoRedirect.headers.get("location"), `/ru?promo=${code}`);
+}
 assert.equal((await fetch(base + "/de/premier-boost")).status, 404);
 assert.equal((await fetch(base + "/ru/not-a-service")).status, 404);
 console.log(JSON.stringify({ ok: true, indexable, localizedPages: 8, privatePagesNoindex: true, canonicalAndSitemap: true }));
