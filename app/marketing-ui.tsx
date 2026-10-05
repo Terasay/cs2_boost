@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { ArrowRight, Crosshair, Menu, X } from "lucide-react";
 import { api } from "./account-ui";
 import { writeStorage } from "@/lib/browser-storage";
@@ -35,6 +35,7 @@ export function MarketingFooter({ lang }: { lang: Language }) {
 }
 
 export function FaqList({ items }: { items: Faq[] }) {
+  const id = useId();
   const [active, setActive] = useState<number | null>(null);
-  return <div className="faq-list">{items.map((item, index) => <div className={active === index ? "faq-item open" : "faq-item"} key={item.question}><button className="faq-question" aria-expanded={active === index} aria-controls={`answer-${index}`} onClick={() => setActive(active === index ? null : index)}>{item.question}<span aria-hidden="true">+</span></button><div className="faq-answer" id={`answer-${index}`} aria-hidden={active !== index}><div><p>{item.answer}</p></div></div></div>)}</div>;
+  return <div className="faq-list">{items.map((item, index) => <div className={active === index ? "faq-item open" : "faq-item"} key={item.question}><button className="faq-question" aria-expanded={active === index} aria-controls={`${id}-answer-${index}`} onClick={() => setActive(active === index ? null : index)}>{item.question}<span aria-hidden="true">+</span></button><div className="faq-answer" id={`${id}-answer-${index}`} aria-hidden={active !== index}><div><p>{item.answer}</p></div></div></div>)}</div>;
 }

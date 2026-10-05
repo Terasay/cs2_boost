@@ -77,8 +77,8 @@ export default function Home({ lang, initialPlatform = "premier", initialService
   try { if(service === "calibration" || (current && target))price = calculatePrice({platform,service,current:Number(current),target:Number(target),redTrust:platform === "premier" && redTrust,promoCode}); }
   catch(reason) { priceProblem = reason instanceof Error && reason.message === "Unknown promo code" ? (lang === "ru" ? "Исправьте промокод или удалите его, чтобы рассчитать стоимость." : "Correct or remove the promo code to calculate the price.") : t.invalid; }
   useEffect(()=>{
-    if(window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;
-    const elements=document.querySelectorAll<HTMLElement>(".content-block h2,.cards article,.steps>div,.faq-layout>div");
+    if(window.matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window))return;
+    const elements=document.querySelectorAll<HTMLElement>(".content-block h2,.cards article,.playing-card,.showcase-step,.steps>div,.faq-layout>div");
     const observer=new IntersectionObserver(entries=>{for(const entry of entries){if(entry.isIntersecting){entry.target.classList.add("is-visible");observer.unobserve(entry.target)}}},{threshold:.12,rootMargin:"0px 0px -35px 0px"});
     elements.forEach(element=>{element.classList.add("scroll-reveal");observer.observe(element)});
     return()=>observer.disconnect();
@@ -115,7 +115,7 @@ export default function Home({ lang, initialPlatform = "premier", initialService
       <section className="content-block alt" id="services"><div className="wrap"><span className="kicker">{t.services.toUpperCase()}</span><h2>{t.serviceTitle}</h2><div className="cards">{serviceSlugs.map((slug,index)=><article key={slug}><span>0{index+1}</span><Crosshair/><h3>{services[lang][slug].heading}</h3><p>{services[lang][slug].intro}</p><a className="service-text-link" href={`/${lang}/${slug}`}>{commonCopy[lang].more}<ArrowRight size={16}/></a></article>)}</div></div></section>
       <PlayingMethods lang={lang} selected={method} onSelect={value => { setMethod(value); document.getElementById("calculator")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" }); }}/>
       <AccountShowcase lang={lang}/>
-      <section className="content-block alt" id="faq"><div className="wrap faq-layout"><div><span className="kicker">FAQ</span><h2>{t.faqTitle}</h2></div><FaqList items={[{question:t.q1,answer:t.a1},{question:t.q2,answer:t.a2},{question:t.q3,answer:t.a3},...commonCopy[lang].questions]}/></div></section>
+      <section className="content-block alt" id="faq"><div className="wrap faq-layout"><div className="faq-help"><span className="kicker">FAQ</span><h2>{t.faqTitle}</h2><p>{lang === "ru" ? "Не нашли ответ? Обсудите детали с администратором перед оформлением." : "Need another answer? Discuss the details with an admin before ordering."}</p><a href="/support"><MessageSquare size={16}/>{lang === "ru" ? "Написать в поддержку" : "Contact support"}<ArrowRight size={15}/></a></div><FaqList items={[{question:t.q1,answer:t.a1},{question:t.q2,answer:t.a2},{question:t.q3,answer:t.a3},...commonCopy[lang].questions]}/></div></section>
     </main>
     <MarketingFooter lang={lang}/>
   </div>;
