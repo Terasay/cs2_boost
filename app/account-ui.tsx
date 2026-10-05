@@ -5,7 +5,7 @@ import { ArrowLeft, Crosshair } from "lucide-react";
 import { readStorage } from "@/lib/browser-storage";
 import { ratingValue } from "@/lib/order-validation";
 
-export type User = { id: string; email: string; role: "client" | "admin" };
+export type User = { id: string; email: string; role: "client" | "admin"; twoFactorEnabled?: boolean };
 export type Draft = { platform: "premier" | "faceit"; service: "rating" | "calibration"; method: "duo" | "piloted"; current: number | null; target: number | null; redTrust?: boolean; promoCode?: string | null };
 
 export function readDraft(): Draft | null {
@@ -34,6 +34,13 @@ export class ApiError extends Error {
 }
 
 const errorMessages: Record<string, string> = {
+  "Two-factor protection is not configured": "Двухфакторная защита пока не настроена на сервере.",
+  "Two-factor protection is already enabled": "Двухфакторная защита уже включена. Обновите страницу.",
+  "Two-factor protection is not enabled": "Двухфакторная защита ещё не включена.",
+  "Invalid or already used verification code": "Код неверный или уже использован. Дождитесь нового кода в приложении или используйте резервный.",
+  "Sign-in verification expired. Sign in again": "Время подтверждения истекло. Введите email и пароль заново.",
+  "Authenticator setup expired. Start again": "Время подключения истекло. Начните подключение заново.",
+  "Account changed. Refresh and try again": "Настройки аккаунта изменились. Обновите страницу и повторите действие.",
   "Price changed. Review the calculator": "Цена изменилась. Вернитесь в калькулятор и проверьте её перед оформлением.",
   "Unknown promo code": "Промокод не найден. Проверьте написание или удалите его.",
   "Invalid order action": "Это действие недоступно для заказа.",

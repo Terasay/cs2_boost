@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import "./globals.css";
 import "./refresh.css";
 import "./order-pricing.css";
+import "./two-factor.css";
 
 export const metadata: Metadata = {
   title: "CS2 Boost — Premier & FACEIT",

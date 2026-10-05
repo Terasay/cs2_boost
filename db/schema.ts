@@ -23,7 +23,28 @@ export const sessions = sqliteTable("sessions", {
   userId: text("user_id").notNull().references(() => users.id),
   expiresAt: integer("expires_at").notNull(),
   version: integer("version").notNull().default(0),
+  twoFactorVerified: integer("two_factor_verified", { mode: "boolean" }).notNull().default(false),
 }, table => [index("sessions_user_idx").on(table.userId), index("sessions_expiry_idx").on(table.expiresAt)]);
+
+export const twoFactors = sqliteTable("two_factors", {
+  userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  secret: text("secret").notNull(),
+  enabledAt: integer("enabled_at"),
+  expiresAt: integer("expires_at").notNull(),
+  lastStep: integer("last_step").notNull().default(-1),
+});
+
+export const recoveryCodes = sqliteTable("recovery_codes", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+}, table => [index("recovery_codes_user_idx").on(table.userId)]);
+
+export const authChallenges = sqliteTable("auth_challenges", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+}, table => [index("auth_challenges_expiry_idx").on(table.expiresAt), index("auth_challenges_user_idx").on(table.userId)]);
 
 export const authAttempts = sqliteTable("auth_attempts", {
   key: text("key").primaryKey(),

@@ -4,15 +4,18 @@ import { chmodSync, lstatSync, readFileSync, writeFileSync } from "node:fs";
 const path = process.argv[2] || "/etc/cs2-boost.env";
 if (lstatSync(path).isSymbolicLink()) throw new Error("Environment file must not be a symlink");
 const source = readFileSync(path, "utf8");
-const lines = source.split(/\r?\n/);
-const matching = lines.filter(line => /^ORDER_ACCESS_KEY=/.test(line));
-if (matching.length > 1) throw new Error("Duplicate ORDER_ACCESS_KEY entries");
-const value = matching[0]?.slice("ORDER_ACCESS_KEY=".length).trim() || "";
-if (value && !/^[a-f0-9]{64}$/i.test(value)) throw new Error("ORDER_ACCESS_KEY must be a 64-character hexadecimal key");
-if (!value) {
-  const setting = `ORDER_ACCESS_KEY=${randomBytes(32).toString("hex")}`;
-  const updated = matching.length ? lines.map(line => /^ORDER_ACCESS_KEY=/.test(line) ? setting : line).join("\n") : `${source.trimEnd()}\n${setting}\n`;
-  writeFileSync(path, updated);
-  console.log("Order access encryption key created in the server environment file");
-} else console.log("Existing order access encryption key preserved");
+let updated = source;
+for (const name of ["ORDER_ACCESS_KEY", "TWO_FACTOR_KEY"]) {
+  const lines = updated.split(/\r?\n/);
+  const matching = lines.filter(line => line.startsWith(`${name}=`));
+  if (matching.length > 1) throw new Error(`Duplicate ${name} entries`);
+  const value = matching[0]?.slice(name.length + 1).trim() || "";
+  if (value && !/^[a-f0-9]{64}$/i.test(value)) throw new Error(`${name} must be a 64-character hexadecimal key`);
+  if (!value) {
+    const setting = `${name}=${randomBytes(32).toString("hex")}`;
+    updated = matching.length ? lines.map(line => line.startsWith(`${name}=`) ? setting : line).join("\n") : `${updated.trimEnd()}\n${setting}\n`;
+    console.log(`${name} created in the server environment file`);
+  } else console.log(`Existing ${name} preserved`);
+}
+if (updated !== source) writeFileSync(path, updated);
 if (process.platform !== "win32") chmodSync(path, 0o640);

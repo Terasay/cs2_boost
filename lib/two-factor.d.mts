@@ -1,0 +1,11 @@
+export function twoFactorKey(): Buffer;
+export function base32(bytes: Uint8Array): string;
+export function generateSecret(): string;
+export function totp(secret: string, step: number, digits?: number): string;
+export function verifyTotp(secret: string, code: string, lastStep?: number, now?: number): number | null;
+export function authenticatorUri(email: string, secret: string): string;
+export function sealSecret(userId: string, secret: string): string;
+export function openSecret(userId: string, sealed: string): string;
+export function generateRecoveryCodes(): string[];
+export function recoveryHash(userId: string, code: unknown): string | null;
+export function tokenHash(value: string): string;
