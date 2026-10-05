@@ -23,7 +23,7 @@ for existing in /etc/cs2-boost.env /etc/systemd/system/cs2-boost.service /etc/ng
 done
 
 apt-get update
-apt-get install -y ca-certificates curl xz-utils git nginx build-essential python3
+apt-get install -y ca-certificates curl xz-utils git nginx
 
 if [[ ! -x /opt/node24/bin/node ]]; then
     case "$(dpkg --print-architecture)" in
@@ -66,8 +66,10 @@ fi
 install -d -m 700 -o cs2boost -g cs2boost /var/lib/cs2-boost /var/backups/cs2-boost
 chown -R cs2boost:cs2boost /opt/cs2-boost
 cd /opt/cs2-boost
-runuser -u cs2boost -- env PATH="$PATH" HOME=/var/lib/cs2-boost npm ci --no-audit --no-fund
-runuser -u cs2boost -- env PATH="$PATH" HOME=/var/lib/cs2-boost NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS=--max-old-space-size=768 npm run build
+runuser -u cs2boost -- env PATH="$PATH" HOME=/var/lib/cs2-boost NODE_OPTIONS=--max-old-space-size=384 npm ci --include=dev --ignore-scripts --prefer-offline --no-audit --no-fund
+runuser -u cs2boost -- env PATH="$PATH" HOME=/var/lib/cs2-boost node scripts/dependencies-ready.mjs
+runuser -u cs2boost -- env PATH="$PATH" HOME=/var/lib/cs2-boost node scripts/dependency-fingerprint.mjs | runuser -u cs2boost -- tee /opt/cs2-boost/node_modules/.cs2-dependencies >/dev/null
+runuser -u cs2boost -- env PATH="$PATH" HOME=/var/lib/cs2-boost NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS=--max-old-space-size=512 npm run build
 install -d -m 700 -o cs2boost -g cs2boost /opt/cs2-boost/.next/cache
 runuser -u cs2boost -- env PATH="$PATH" NODE_ENV=production DATABASE_PATH=/var/lib/cs2-boost/cs2.sqlite node scripts/migrate.mjs
 

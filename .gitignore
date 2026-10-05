@@ -1,5 +1,6 @@
 
 /node_modules
+/pages-demo/node_modules/
 /.npm-cache/
 /.pnp
 .pnp.*
