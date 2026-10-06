@@ -6,6 +6,7 @@ import "./order-pricing.css";
 import "./two-factor.css";
 import "./interface.css";
 import "./tactical.css";
+import "./legal.css";
 
 export const metadata: Metadata = {
   title: "CS2 Boost — Premier & FACEIT",

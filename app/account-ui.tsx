@@ -26,7 +26,7 @@ export function useLanguage() {
 
 export function AccountShell({ children, back, backLabel, workspace = false }: { children: React.ReactNode; back?: string; backLabel?: string; workspace?: boolean }) {
   const lang = useLanguage();
-  return <div className={workspace ? "account-page workspace-shell" : "account-page"}><header className="account-header wrap"><Brand href={`/${lang}`}/><span className="workspace-context">{workspace ? (lang === "ru" ? "ЛИЧНЫЙ КАБИНЕТ" : "ACCOUNT WORKSPACE") : "SECURE ACCESS"}</span><a href={back ?? `/${lang}`} className="account-back"><ArrowLeft size={17}/>{backLabel ?? (lang === "ru" ? "На главную" : "Home")}</a></header><main className="account-main wrap">{children}</main></div>;
+  return <div className={workspace ? "account-page workspace-shell" : "account-page"}><header className="account-header wrap"><Brand href={`/${lang}`}/><span className="workspace-context">{workspace ? (lang === "ru" ? "ЛИЧНЫЙ КАБИНЕТ" : "ACCOUNT WORKSPACE") : "SECURE ACCESS"}</span><a href={back ?? `/${lang}`} className="account-back"><ArrowLeft size={17}/>{backLabel ?? (lang === "ru" ? "На главную" : "Home")}</a></header><main className="account-main wrap">{children}</main><footer className="wrap account-legal" aria-label={lang === "ru" ? "Документы сервиса" : "Service documents"}><a href={`/${lang}/legal`}>{lang === "ru" ? "Документы сервиса" : "Service documents"}</a><a href={`/${lang}/legal/terms`}>{lang === "ru" ? "Соглашение" : "Terms"}</a><a href={`/${lang}/legal/privacy`}>{lang === "ru" ? "Конфиденциальность" : "Privacy"}</a><a href={`/${lang}/legal/payments`}>{lang === "ru" ? "Оплата и возвраты" : "Payments & refunds"}</a></footer></div>;
 }
 
 export class ApiError extends Error {
