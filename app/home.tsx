@@ -6,11 +6,9 @@ import { calculatePrice, type Price } from "@/lib/pricing.mjs";
 import { PriceSummary, PromoInput } from "./price-summary";
 import { api, readDraft } from "./account-ui";
 import Image from "next/image";
-import { ArrowRight, Crosshair, MessageSquare } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUpRight, Check, Crosshair, LockKeyhole, MessageSquare, ShieldCheck, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { AnimatedNumber, ObjectiveHud, RatingControl } from "./tactical-ui";
 
 import { MarketingHeader, MarketingFooter, FaqList } from "./marketing-ui";
 import { PlayingMethods, AccountShowcase } from "./home-showcase";
@@ -22,7 +20,7 @@ type Method = "duo" | "piloted";
 const words = {
   ru: {
     services:"Услуги", process:"Как это работает", faq:"Вопросы", login:"Войти", eyebrow:"CS2 / PREMIER / FACEIT",
-    title1:"Буст CS2.",title2:"Premier и FACEIT.",intro:"Буст рейтинга и калибровка в CS2. Настройте заказ и получите подтверждённую цену и срок до оплаты.",
+    title1:"БУСТ CS2",title2:"PREMIER / FACEIT",intro:"От вашего текущего рейтинга до следующей цели. Выберите формат игры — мы поможем пройти этот путь.",
     benefit1:"Premier и FACEIT",benefit2:"Чат с администратором",config:"НАСТРОЙКА ЗАКАЗА",configTitle:"Ваш маршрут к рейтингу",
     platform:"Площадка",service:"Услуга",rating:"Буст рейтинга",calibration:"Калибровка",method:"Способ выполнения",duo:"Игра вместе",piloted:"На вашем аккаунте",
     current:"Текущий рейтинг",target:"Желаемый рейтинг",calibrationHint:"Условия калибровки уточним после заявки.",
@@ -34,7 +32,7 @@ const words = {
   },
   en: {
     services:"Services",process:"How it works",faq:"FAQ",login:"Sign in",eyebrow:"CS2 / PREMIER / FACEIT",
-    title1:"CS2 Boost.",title2:"Premier & FACEIT.",intro:"CS2 rating boosts and calibration. Configure your request and receive a confirmed price and deadline before paying.",
+    title1:"CS2 BOOST",title2:"PREMIER / FACEIT",intro:"From your current rating to your next goal. Choose how you play. We'll help you get there.",
     benefit1:"Premier and FACEIT",benefit2:"Direct admin chat",config:"CONFIGURE YOUR ORDER",configTitle:"Your route to the next rank",
     platform:"Platform",service:"Service",rating:"Rating boost",calibration:"Calibration",method:"Boost method",duo:"Play together",piloted:"On your account",
     current:"Current rating",target:"Target rating",calibrationHint:"We'll confirm calibration details after your request.",
@@ -50,8 +48,8 @@ export default function Home({ lang, initialPlatform = "premier", initialService
   const [platform,setPlatform]=useState<Platform>(initialPlatform);
   const [service,setService]=useState<Service>(initialService);
   const [method,setMethod]=useState<Method>("duo");
-  const [current,setCurrent]=useState("");
-  const [target,setTarget]=useState("");
+  const [current,setCurrent]=useState(initialPlatform === "faceit" ? "1000" : "4500");
+  const [target,setTarget]=useState(initialPlatform === "faceit" ? "1500" : "10000");
   const [redTrust,setRedTrust]=useState(false);
   const [promoCode,setPromoCode]=useState("");
   const [error,setError]=useState("");
@@ -78,11 +76,19 @@ export default function Home({ lang, initialPlatform = "premier", initialService
   catch(reason) { priceProblem = reason instanceof Error && reason.message === "Unknown promo code" ? (lang === "ru" ? "Исправьте промокод или удалите его, чтобы рассчитать стоимость." : "Correct or remove the promo code to calculate the price.") : t.invalid; }
   useEffect(()=>{
     if(window.matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window))return;
-    const elements=document.querySelectorAll<HTMLElement>(".content-block h2,.cards article,.playing-card,.showcase-step,.steps>div,.faq-layout>div");
+    const elements=document.querySelectorAll<HTMLElement>(".tactical-section .section-heading,.service-module,.playing-card,.account-preview,.showcase-copy,.process-rail,.faq-layout>div");
     const observer=new IntersectionObserver(entries=>{for(const entry of entries){if(entry.isIntersecting){entry.target.classList.add("is-visible");observer.unobserve(entry.target)}}},{threshold:.12,rootMargin:"0px 0px -35px 0px"});
     elements.forEach(element=>{element.classList.add("scroll-reveal");observer.observe(element)});
     return()=>observer.disconnect();
   },[]);
+  function changePlatform(value: Platform) {
+    if (value === platform) return;
+    setPlatform(value);
+    setCurrent(value === "faceit" ? "1000" : "4500");
+    setTarget(value === "faceit" ? "1500" : "10000");
+    setRedTrust(false);
+    setError("");
+  }
   function next(){
     const start=Number(current),end=Number(target);
     if(service==="rating"&&(!current||!target||!Number.isInteger(start)||!Number.isInteger(end)||start<0||end<=start||end>100000)){setError(t.invalid);return}
@@ -91,31 +97,45 @@ export default function Home({ lang, initialPlatform = "premier", initialService
     if(!writeStorage("sessionStorage","cs2-draft",JSON.stringify({platform,service,method,current:service==="rating"?start:null,target:service==="rating"?end:null,redTrust:platform==="premier"&&redTrust,promoCode:price.promoCode}))){setError(lang==="ru"?"Разрешите хранение данных в браузере, чтобы продолжить оформление.":"Allow browser storage to continue your request.");return}
     window.location.assign("/register");
   }
-  return <div className="site">
+  return <div className="site tactical-home">
     <MarketingHeader lang={lang}/>
     <main>
-      <section className="hero wrap">
-        <div className="hero-copy"><span className="eyebrow">{t.eyebrow}</span><h1>{t.title1}<br/><em>{t.title2}</em></h1><p>{t.intro}</p><div className="hero-points"><span><Crosshair size={18}/>{t.benefit1}</span><span><MessageSquare size={18}/>{t.benefit2}</span></div><div className="hero-media"><Image src="/hero-arena.png" alt="" width={1536} height={1024} priority/></div></div>
-        <div className="quote-card" id="calculator">
-          <div className="quote-heading"><div><span className="kicker">{t.config}</span><h2>{t.configTitle}</h2></div><small>01 / 03</small></div>
-          <div className="quote-body">
-            <div className="field"><label>{t.platform}</label><div className="segments"><button className={platform==="premier"?"selected":""} onClick={()=>setPlatform("premier")}>PREMIER</button><button className={platform==="faceit"?"selected":""} onClick={()=>setPlatform("faceit")}>FACEIT</button></div></div>
-            <div className="field"><label htmlFor="service">{t.service}</label><Select value={service} onValueChange={value=>setService(value as Service)}><SelectTrigger id="service" className="select-control"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="rating">{t.rating}</SelectItem><SelectItem value="calibration">{t.calibration}</SelectItem></SelectContent></Select></div>
-            <div className="field"><label>{t.method}</label><RadioGroup className="methods" value={method} onValueChange={value=>setMethod(value as Method)}><label className={method==="duo"?"selected":""}><RadioGroupItem value="duo"/>{t.duo}</label><label className={method==="piloted"?"selected":""}><RadioGroupItem value="piloted"/>{t.piloted}</label></RadioGroup></div>
-            {service==="rating"?<div className="rating-row"><div className="field"><label htmlFor="current">{t.current}</label><Input id="current" type="number" min="0" inputMode="numeric" value={current} onChange={event=>setCurrent(event.target.value)} placeholder="4 500" className="rating-control"/></div><div className="field"><label htmlFor="target">{t.target}</label><Input id="target" type="number" min="1" inputMode="numeric" value={target} onChange={event=>setTarget(event.target.value)} placeholder="10 000" className="rating-control"/></div></div>:<p className="calibration-hint">{t.calibrationHint}</p>}
-            {platform === "premier" && <label className="trust-check"><input type="checkbox" checked={redTrust} onChange={event=>setRedTrust(event.target.checked)}/><span>{lang === "ru" ? "На аккаунте красный траст · +10%" : "Red trust on this account · +10%"}</span></label>}
-            <p className="tariff-note">{platform === "premier" ? (lang === "ru" ? "500 ₽ / 1 000 рейтинга. При исходном рейтинге выше 10 000 — 700 ₽." : "500 RUB / 1,000 rating. Starting above 10,000: 700 RUB.") : (lang === "ru" ? "500 ₽ / 100 ELO. При исходном ELO выше 1 200 — 700 ₽." : "500 RUB / 100 ELO. Starting above 1,200: 700 RUB.")}<br/>{lang === "ru" ? "Неполный шаг оплачивается пропорционально; срок округляется до целого дня." : "Partial steps are priced proportionally; delivery time rounds up to a whole day."}</p>
-            <PromoInput value={promoCode} onChange={value=>{setPromoCode(value);writeStorage("sessionStorage","cs2-promo",value)}} ru={lang === "ru"}/>
-            <PriceSummary price={price} ru={lang === "ru"} problem={priceProblem}/>
-            {error&&<p className="error" role="alert">{error}</p>}
-            <Button className="continue-button" onClick={next}>{t.continue}<ArrowRight size={19}/></Button><p className="under-button">{signedIn?(lang==="ru"?"Заявка сохранится в личном кабинете":"Your request will be saved in your account"):t.accountLater}</p>
-          </div>
+      <section className="tactical-hero">
+        <div className="arena-backdrop"><Image src="/hero-arena.png" alt="" fill sizes="100vw" priority/></div>
+        <div className="hero-scan" aria-hidden="true"/>
+        <div className="wrap tactical-hero-inner">
+          <div className="hero-copy"><span className="eyebrow">COMPETITIVE SERVICES <i>{"// 01"}</i></span><h1>{t.title1}<em>{t.title2}</em></h1><p>{t.intro}</p><div className="hero-actions"><a className="tactical-primary" href="#calculator">{lang === "ru" ? "Рассчитать стоимость" : "Calculate your price"}<ArrowUpRight size={20}/></a><a className="hero-secondary" href="#process">{t.process}<ArrowRight size={16}/></a></div><div className="hero-platforms"><span><i/>PREMIER</span><span><i/>FACEIT</span><span>DUO / PILOTED</span></div></div>
+          <ObjectiveHud platform={platform} current={service === "rating" ? current : ""} target={service === "rating" ? target : ""} method={method} price={price} ru={lang === "ru"} calibration={service === "calibration"}/>
+          <div className="hero-bottom"><a href="#calculator"><ArrowDown size={15}/>{lang === "ru" ? "НАСТРОЙТЕ СВОЙ ЗАКАЗ" : "CONFIGURE YOUR ORDER"}</a><span>{"MAP // ARENA"} <i>{"QUEUE // "}{platform.toUpperCase()}</i></span></div>
         </div>
       </section>
-      <section className="content-block alt" id="services"><div className="wrap"><span className="kicker">{t.services.toUpperCase()}</span><h2>{t.serviceTitle}</h2><div className="cards">{serviceSlugs.map((slug,index)=><article key={slug}><span>0{index+1}</span><Crosshair/><h3>{services[lang][slug].heading}</h3><p>{services[lang][slug].intro}</p><a className="service-text-link" href={`/${lang}/${slug}`}>{commonCopy[lang].more}<ArrowRight size={16}/></a></article>)}</div></div></section>
+      <div className="trust-strip"><div className="wrap"><span><ShieldCheck size={16}/>{lang === "ru" ? "Цена до оплаты" : "Price before payment"}</span><span><MessageSquare size={16}/>{lang === "ru" ? "Чат внутри заказа" : "Your own order chat"}</span><span><UsersRound size={16}/>{lang === "ru" ? "Можно играть вместе" : "Duo play available"}</span><span><Crosshair size={16}/>PREMIER + FACEIT</span></div></div>
+      <section className="tactical-section configure-section" id="calculator"><div className="wrap configure-wrap">
+        <div className="section-heading"><div><span className="kicker">01 // CONFIGURE</span><h2>{t.configTitle}</h2></div><div className="configure-steps"><span className="current"><b>01</b>{t.platform}</span><i/><span><b>02</b>{lang === "ru" ? "Цель" : "Target"}</span><i/><span><b>03</b>{lang === "ru" ? "Заказ" : "Order"}</span></div></div>
+        <div className="order-configurator">
+          <div className="configuration-fields">
+            <div className="config-section-label"><span>01 / {t.platform.toUpperCase()}</span><span>PREMIER / FACEIT</span></div>
+            <div className="platform-selector" role="group" aria-label={t.platform}><button type="button" className={platform === "premier" ? "platform-card selected" : "platform-card"} aria-pressed={platform === "premier"} onClick={()=>changePlatform("premier")}><span className="platform-symbol"><Crosshair size={28}/></span><span><strong>PREMIER</strong><small>CS2 MATCHMAKING</small></span><span className="selection-square">{platform === "premier" && <Check size={12}/>}</span></button><button type="button" className={platform === "faceit" ? "platform-card selected" : "platform-card"} aria-pressed={platform === "faceit"} onClick={()=>changePlatform("faceit")}><span className="platform-symbol faceit-symbol"><ArrowUpRight size={30}/></span><span><strong>FACEIT</strong><small>ELO BOOST</small></span><span className="selection-square">{platform === "faceit" && <Check size={12}/>}</span></button></div>
+            <div className="config-options"><div><span className="config-label">{t.service}</span><div className="tactical-toggle" role="group" aria-label={t.service}><button type="button" aria-pressed={service === "rating"} className={service === "rating" ? "selected" : ""} onClick={()=>{setService("rating");setError("")}}>{t.rating}</button><button type="button" aria-pressed={service === "calibration"} className={service === "calibration" ? "selected" : ""} onClick={()=>{setService("calibration");setError("")}}>{t.calibration}</button></div></div><div><span className="config-label">{t.method}</span><div className="tactical-toggle" role="group" aria-label={t.method}><button type="button" aria-pressed={method === "duo"} className={method === "duo" ? "selected" : ""} onClick={()=>setMethod("duo")}><UsersRound size={15}/>DUO</button><button type="button" aria-pressed={method === "piloted"} className={method === "piloted" ? "selected" : ""} onClick={()=>setMethod("piloted")}><LockKeyhole size={15}/>PILOTED</button></div></div></div>
+            <div className="config-section-label"><span>02 / {lang === "ru" ? "ВАША ЦЕЛЬ" : "YOUR TARGET"}</span><span>{service === "rating" ? (platform === "premier" ? "RATING" : "ELO") : "CALIBRATION"}</span></div>
+            {service === "rating" ? <div className="rating-modules"><RatingControl id="current" label={t.current} value={current} onChange={setCurrent} platform={platform} ru={lang === "ru"}/><RatingControl id="target" label={t.target} value={target} onChange={setTarget} platform={platform} target ru={lang === "ru"}/></div> : <div className="calibration-module"><Crosshair size={32}/><div><h3>{lang === "ru" ? "Начните с калибровки" : "Start with calibration"}</h3><p>{t.calibrationHint}</p></div></div>}
+            {platform === "premier" && <label className={`trust-check${redTrust ? " active" : ""}`}><input type="checkbox" checked={redTrust} onChange={event=>setRedTrust(event.target.checked)}/><span>{lang === "ru" ? "На аккаунте красный траст" : "Red trust on this account"}</span><b>+10%</b></label>}
+            {service === "rating" && <><div className="config-tariff"><span>{lang === "ru" ? "БАЗОВЫЙ ТАРИФ" : "BASE RATE"}</span><strong>{price?.rate ?? (Number(current) > (platform === "premier" ? 10000 : 1200) ? 700 : 500)} ₽ <small>/ {platform === "premier" ? (lang === "ru" ? "1 000 рейтинга" : "1,000 rating") : "100 ELO"}</small></strong></div>
+            <p className="tariff-note">{platform === "premier" ? (lang === "ru" ? "Выше 10 000 на старте — 700 ₽ за 1 000 рейтинга." : "Starting above 10,000: 700 RUB per 1,000 rating.") : (lang === "ru" ? "Выше 1 200 ELO на старте — 700 ₽ за 100 ELO." : "Starting above 1,200: 700 RUB per 100 ELO.")} {lang === "ru" ? "Неполный шаг — пропорционально, срок округляется до дня." : "Partial steps are priced proportionally; time rounds up to a day."}</p></>}
+          </div>
+          <aside className="configuration-summary"><div className="summary-heading"><span>{lang === "ru" ? "ВАШ ЗАКАЗ" : "YOUR ORDER"}</span><span>03 / CONFIRM</span></div><div className="summary-mode"><strong>{platform.toUpperCase()}</strong><span>{service === "calibration" ? t.calibration : method.toUpperCase()}</span></div>
+            {service === "rating" ? <><div className="summary-route"><span>{current ? <AnimatedNumber value={Number(current)} ru={lang === "ru"}/> : "—"}</span><ArrowRight size={22}/><strong>{target ? <AnimatedNumber value={Number(target)} ru={lang === "ru"}/> : "—"}</strong></div><div className="summary-delta">{price?.durationDays ? `+${new Intl.NumberFormat(lang === "ru" ? "ru-RU" : "en-US").format(Number(target) - Number(current))} ${platform === "premier" ? (lang === "ru" ? "рейтинга" : "rating") : "ELO"}` : (lang === "ru" ? "Укажите корректную цель" : "Set a valid target")}</div></> : <div className="summary-calibration">UNRANKED<ArrowUpRight size={22}/></div>}
+            <PriceSummary price={price} ru={lang === "ru"} problem={priceProblem}/>
+            <PromoInput value={promoCode} onChange={value=>{setPromoCode(value);writeStorage("sessionStorage","cs2-promo",value)}} ru={lang === "ru"}/>
+            {error&&<p className="error" role="alert">{error}</p>}
+            <Button className="continue-button tactical-primary" onClick={next} disabled={!price}>{t.continue}<ArrowUpRight size={19}/></Button><p className="under-button">{signedIn?(lang==="ru"?"Заказ сохранится в вашем кабинете":"Saved to your account"):t.accountLater}</p><div className="summary-assurance"><ShieldCheck size={14}/>{lang === "ru" ? "Оплата после принятия заявки" : "Pay after your request is accepted"}</div>
+          </aside>
+        </div>
+      </div></section>
+      <section className="tactical-section services-section" id="services"><div className="wrap"><div className="section-heading"><div><span className="kicker">02 // MATCH SERVICES</span><h2>{lang === "ru" ? "Каждая цель — свой маршрут." : "Every goal. Its own route."}</h2></div><p>{lang === "ru" ? "Две площадки, один понятный процесс. Начните с того, что нужно вашему аккаунту." : "Two platforms. One clear process. Start with what your account needs."}</p></div><div className="service-modules">{serviceSlugs.map((slug,index)=><article className={`service-module service-module-${index}`} key={slug}><div className="service-module-top"><span>0{index+1}</span><span>{index === 0 ? "MATCHMAKING" : index === 1 ? "COMPETITIVE" : "NEW START"}</span><ArrowUpRight size={20}/></div><h3>{services[lang][slug].label}</h3><p>{index === 0 ? (lang === "ru" ? "Рейтинг Premier до выбранной цели." : "Premier rating towards your chosen target.") : index === 1 ? (lang === "ru" ? "Следующий шаг в вашем ELO." : "Your next step in ELO.") : (lang === "ru" ? "Первые матчи. Начало вашего пути." : "First matches. Your starting point.")}</p><div className="service-growth" aria-hidden="true"><span>{index === 0 ? "05K" : index === 1 ? "1 000" : "—"}</span><div><i/></div><strong>{index === 0 ? "10K" : index === 1 ? "1 500" : "RANK"}</strong></div><div className="service-rate">{index < 2 ? <><strong>500 ₽</strong><span>/ {index === 0 ? (lang === "ru" ? "1 000 рейтинга" : "1,000 rating") : "100 ELO"}</span></> : <strong>{lang === "ru" ? "По согласованию" : "By agreement"}</strong>}</div><a className="module-link" href={`/${lang}/${slug}`}>{commonCopy[lang].more}<ArrowRight size={17}/></a></article>)}</div></div></section>
       <PlayingMethods lang={lang} selected={method} onSelect={value => { setMethod(value); document.getElementById("calculator")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" }); }}/>
       <AccountShowcase lang={lang}/>
-      <section className="content-block alt" id="faq"><div className="wrap faq-layout"><div className="faq-help"><span className="kicker">FAQ</span><h2>{t.faqTitle}</h2><p>{lang === "ru" ? "Не нашли ответ? Обсудите детали с администратором перед оформлением." : "Need another answer? Discuss the details with an admin before ordering."}</p><a href="/support"><MessageSquare size={16}/>{lang === "ru" ? "Написать в поддержку" : "Contact support"}<ArrowRight size={15}/></a></div><FaqList items={[{question:t.q1,answer:t.a1},{question:t.q2,answer:t.a2},{question:t.q3,answer:t.a3},...commonCopy[lang].questions]}/></div></section>
+      <section className="tactical-section faq-section" id="faq"><div className="wrap faq-layout"><div className="faq-help"><span className="kicker">06 // INTEL</span><h2>{lang === "ru" ? "До начала матча." : "Before the first match."}</h2><p>{lang === "ru" ? "Коротко о цене, заказе и формате игры. Остальное обсудим в чате." : "Price, order and playing method. We can discuss the rest in chat."}</p><a href="/support"><MessageSquare size={16}/>{lang === "ru" ? "Спросить администратора" : "Ask an admin"}<ArrowUpRight size={16}/></a></div><FaqList items={[{question:t.q1,answer:t.a1},{question:t.q2,answer:t.a2},{question:t.q3,answer:t.a3},...commonCopy[lang].questions]}/></div></section>
     </main>
     <MarketingFooter lang={lang}/>
   </div>;

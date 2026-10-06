@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowLeft, Crosshair } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { readStorage } from "@/lib/browser-storage";
 import { ratingValue } from "@/lib/order-validation";
+import { Brand } from "./tactical-ui";
 
 export type User = { id: string; email: string; role: "client" | "admin"; twoFactorEnabled?: boolean };
 export type Draft = { platform: "premier" | "faceit"; service: "rating" | "calibration"; method: "duo" | "piloted"; current: number | null; target: number | null; redTrust?: boolean; promoCode?: string | null };
@@ -25,7 +26,7 @@ export function useLanguage() {
 
 export function AccountShell({ children, back, backLabel, workspace = false }: { children: React.ReactNode; back?: string; backLabel?: string; workspace?: boolean }) {
   const lang = useLanguage();
-  return <div className={workspace ? "account-page workspace-shell" : "account-page"}><header className="account-header wrap"><a href={`/${lang}`} className="brand"><span className="brand-mark"><Crosshair size={22}/></span>CS2<span>BOOST</span></a><a href={back ?? `/${lang}`} className="account-back"><ArrowLeft size={17}/>{backLabel ?? (lang === "ru" ? "На главную" : "Home")}</a></header><main className="account-main wrap">{children}</main></div>;
+  return <div className={workspace ? "account-page workspace-shell" : "account-page"}><header className="account-header wrap"><Brand href={`/${lang}`}/><span className="workspace-context">{workspace ? (lang === "ru" ? "ЛИЧНЫЙ КАБИНЕТ" : "ACCOUNT WORKSPACE") : "SECURE ACCESS"}</span><a href={back ?? `/${lang}`} className="account-back"><ArrowLeft size={17}/>{backLabel ?? (lang === "ru" ? "На главную" : "Home")}</a></header><main className="account-main wrap">{children}</main></div>;
 }
 
 export class ApiError extends Error {
