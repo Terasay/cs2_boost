@@ -16,7 +16,7 @@ export const services: Record<Language, Record<ServiceSlug, ServiceContent>> = {
   ru: {
     "premier-boost": {
       title: "Буст Premier CS2 — рейтинг, способы и оформление заказа",
-      description: "Буст рейтинга Premier в CS2: игра вместе или выполнение на аккаунте. Согласуйте целевой рейтинг, стоимость и срок с администратором до оплаты.",
+      description: "Буст рейтинга Premier в CS2 от 500 ₽ за 1 000 рейтинга. Калькулятор цены и срока, игра вместе или на аккаунте, чат и статус заказа в кабинете.",
       heading: "Буст рейтинга Premier в CS2", label: "PREMIER", platform: "premier", service: "rating",
       intro: "Укажите текущий и желаемый рейтинг Premier. Обсудите формат игры с администратором и подтвердите предложение перед началом выполнения.",
       overview: "Заказ на буст Premier оформляется под конкретную цель по рейтингу. В заявке сохраняются начальное и желаемое значения, способ выполнения и согласованные условия. Если рейтинг ещё не определён, выберите калибровку: её условия обсуждаются отдельно.",
@@ -31,7 +31,7 @@ export const services: Record<Language, Record<ServiceSlug, ServiceContent>> = {
     },
     "faceit-boost": {
       title: "Буст FACEIT CS2 — повышение рейтинга и игра вместе",
-      description: "Заявка на буст FACEIT в CS2. Укажите текущий и целевой рейтинг, выберите способ выполнения и получите предложение с ценой и сроком до оплаты.",
+      description: "Буст FACEIT в CS2 от 500 ₽ за 100 ELO. Рассчитайте цену и срок, выберите игру вместе или на аккаунте. Оплата после принятия заказа администратором.",
       heading: "Буст FACEIT в CS2", label: "FACEIT", platform: "faceit", service: "rating",
       intro: "Согласуйте повышение рейтинга FACEIT под вашу цель. Выберите игру вместе или выполнение на аккаунте и обсудите детали до подтверждения заказа.",
       overview: "В форме заказа FACEIT укажите рейтинг, который отображается в вашем профиле, и желаемое значение. Конкретную цель, особенности аккаунта и доступное время можно дополнить в чате. Все договорённости по цене и дате завершения фиксируются в предложении администратора.",
@@ -63,7 +63,7 @@ export const services: Record<Language, Record<ServiceSlug, ServiceContent>> = {
   en: {
     "premier-boost": {
       title: "CS2 Premier Boost — Rating Goals, Methods and Orders",
-      description: "Request a CS2 Premier rating boost. Play together or choose a piloted order, then agree on your target, price and completion date before payment.",
+      description: "CS2 Premier boost from 500 RUB per 1,000 rating. Calculate your price and duration, choose duo or piloted play, and track progress in your order chat.",
       heading: "CS2 Premier rating boost", label: "PREMIER", platform: "premier", service: "rating",
       intro: "Enter your current and target Premier rating. Discuss the playing method with an admin and review the offer before work begins.",
       overview: "A Premier boost request starts with a specific rating goal. Your order keeps the starting and target values, playing method and agreed terms together. If your rating has not been established yet, choose calibration and discuss its conditions separately.",
@@ -78,7 +78,7 @@ export const services: Record<Language, Record<ServiceSlug, ServiceContent>> = {
     },
     "faceit-boost": {
       title: "CS2 FACEIT Boost — Rating Requests and Duo Play",
-      description: "Configure a CS2 FACEIT boost with your current and target rating. Choose your playing method and review an admin's price and deadline before payment.",
+      description: "CS2 FACEIT boost from 500 RUB per 100 ELO. Calculate your price and duration, choose duo or piloted play, and pay after an admin accepts your order.",
       heading: "CS2 FACEIT boost", label: "FACEIT", platform: "faceit", service: "rating",
       intro: "Plan a FACEIT rating boost around your goal. Choose duo or piloted play and discuss the details before confirming your order.",
       overview: "Enter the rating shown on your FACEIT profile and the value you want to reach. Use the order chat to explain your goal, account details and availability. The admin records the agreed price and completion date in an offer for you to review.",

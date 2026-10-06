@@ -8,11 +8,12 @@ import "./interface.css";
 
 export const metadata: Metadata = {
   title: "CS2 Boost — Premier & FACEIT",
-  description: "Configure a CS2 Premier or FACEIT boost and request a personal quote.",
+  description: "CS2 Premier and FACEIT boosts from 500 RUB. Calculate your price and duration, choose duo or piloted play, and track your order in your account.",
   robots: { index: false, follow: false },
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
+    icon: [{ url: "/favicon.png", type: "image/png", sizes: "120x120" }],
+    shortcut: "/favicon.ico",
+    apple: [{ url: "/apple-touch-icon.png", type: "image/png", sizes: "180x180" }],
   },
 };
 

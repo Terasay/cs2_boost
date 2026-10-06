@@ -13,6 +13,9 @@ for (const lang of ["ru", "en"]) for (const slug of slugs) {
   assert.match(html, new RegExp(`<html[^>]+lang="${lang}"`));
   assert.equal((html.match(/<h1(?:\s|>)/g) || []).length, 1, path);
   assert.match(html, /<meta name="description" content="[^"]{50,}"/);
+  assert.doesNotMatch(html, /nosnippet|max-snippet\s*:\s*0|data-nosnippet/i, path);
+  assert.doesNotMatch(response.headers.get("x-robots-tag") || "", /noindex|nosnippet/i, path);
+  assert.match(html, /rel="icon"[^>]+href="\/favicon\.png"/);
   assert.match(html, indexable ? /<meta name="robots" content="index, follow"/ : /<meta name="robots" content="noindex, follow"/);
   for (const other of slugs.slice(1)) assert(html.includes(`href="/${lang}/${other}"`), `Missing navigation to ${other}`);
   if (indexable) {
@@ -21,8 +24,30 @@ for (const lang of ["ru", "en"]) for (const slug of slugs) {
     assert.match(html, /hrefLang="ru"/i);
     assert.match(html, /hrefLang="en"/i);
     assert.match(html, /property="og:image"/);
+    if (!slug) {
+      const data = [...html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)].map(match => JSON.parse(match[1]));
+      const website = data.find(item => item["@type"] === "WebSite");
+      assert(website, "Missing site name structured data");
+      assert.equal(website.url, canonicalOrigin + "/");
+      assert.equal(website.name, "CS2 Boost");
+    }
   }
 }
+for (const [path, size] of [["/favicon.png", 120], ["/apple-touch-icon.png", 180]]) {
+  const response = await fetch(base + path, { headers: { "User-Agent": "Googlebot-Image" } });
+  assert.equal(response.status, 200, path);
+  assert.match(response.headers.get("content-type") || "", /^image\/png/);
+  const png = Buffer.from(await response.arrayBuffer());
+  assert.equal(png.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+  assert.equal(png.readUInt32BE(16), size);
+  assert.equal(png.readUInt32BE(20), size);
+}
+const icon = await fetch(base + "/favicon.ico");
+assert.equal(icon.status, 200);
+assert.equal(Buffer.from(await icon.arrayBuffer()).subarray(0, 4).toString("hex"), "00000100");
+const yandex = await fetch(base + "/ru", { headers: { "User-Agent": "YandexBot" } });
+assert.equal(yandex.status, 200);
+assert.match(await yandex.text(), /<meta name="description" content="[^"]{50,}"/);
 const map = await fetch(base + "/sitemap.xml").then(response => response.text());
 assert.equal((map.match(/<loc>/g) || []).length, indexable ? 8 : 0);
 assert.doesNotMatch(map, /dashboard|orders|support|analytics|localhost|127\.0\.0\.1/);
