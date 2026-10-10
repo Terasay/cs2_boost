@@ -20,6 +20,8 @@
     "test:two-factor:smoke": "node scripts/two-factor-smoke.mjs",
     "test:chat": "node --test scripts/chat.test.mjs",
     "test:pricing": "node --test scripts/pricing.test.mjs",
+    "test:donationalerts": "node --test scripts/donationalerts.test.mjs",
+    "test:donationalerts:smoke": "node scripts/donationalerts-smoke.mjs",
     "test:orders": "node scripts/order-smoke.mjs",
     "test:mail": "node --test scripts/mail.test.mjs",
     "test:mail:smoke": "node scripts/mail-smoke.mjs",

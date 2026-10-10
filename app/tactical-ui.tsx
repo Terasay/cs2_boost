@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ArrowUpRight, Crosshair, Timer } from "lucide-react";
-import type { Price } from "@/lib/pricing.mjs";
+import { ratingLimits, type Price } from "@/lib/pricing.mjs";
 
 export function Brand({ href }: { href: string }) {
   return <a href={href} className="brand" aria-label="CS2 Boost"><span className="brand-mark" aria-hidden="true"><svg viewBox="0 0 30 30" fill="none"><path d="m3 6 8 9-8 9M14 6l8 9-8 9" stroke="currentColor" strokeWidth="3"/></svg></span><span className="brand-word">CS2<strong>BOOST</strong></span><i aria-hidden="true">/</i></a>;
@@ -30,16 +30,17 @@ export function AnimatedNumber({ value, ru = true, currency = false }: { value: 
   return <><span aria-hidden="true">{formatter.format(display)}</span><span className="sr-only">{formatter.format(value)}</span></>;
 }
 
-export function RatingControl({ id, label, value, onChange, platform, target, ru }: { id: string; label: string; value: string; onChange: (value: string) => void; platform: "premier" | "faceit"; target?: boolean; ru: boolean }) {
+export function RatingControl({ id, label, value, onChange, platform, target, minimum, ru }: { id: string; label: string; value: string; onChange: (value: string) => void; platform: "premier" | "faceit"; target?: boolean; minimum?: number; ru: boolean }) {
   const number = Number(value) || 0;
-  const scale = platform === "premier" ? 30000 : 3000;
-  const max = Math.min(100000, Math.max(scale, Math.ceil(number / scale) * scale));
+  const limits = ratingLimits[platform];
+  const max = target ? limits.maxTarget : limits.maxTarget - limits.minIncrease;
+  const min = target ? Math.min(max, Math.max(limits.minIncrease, minimum ?? limits.minIncrease)) : 0;
   const color = platform === "faceit" ? "#f59b23" : number >= 20000 ? "#e35858" : number >= 15000 ? "#bd88f3" : number >= 10000 ? "#729af2" : "#8ba8bb";
-  return <div className={`rating-module${target ? " is-target" : ""}`} style={{ "--rating-fill": `${Math.max(0, Math.min(100, number / max * 100))}%`, "--rating-color": color } as CSSProperties}>
+  return <div className={`rating-module${target ? " is-target" : ""}`} style={{ "--rating-fill": `${max === min ? 100 : Math.max(0, Math.min(100, (number - min) / (max - min) * 100))}%`, "--rating-color": color } as CSSProperties}>
     <label htmlFor={id}><span>{target ? "02" : "01"}</span>{label}</label>
-    <div className="rating-value"><input id={id} type="number" min={target ? 1 : 0} max={100000} inputMode="numeric" value={value} onChange={event => onChange(event.target.value)} placeholder={platform === "premier" ? (target ? "10000" : "4500") : (target ? "1500" : "1000")}/><small>{platform === "premier" ? (ru ? "РЕЙТИНГ" : "RATING") : "ELO"}</small></div>
-    <input className="rating-slider" type="range" min={target ? 1 : 0} max={max} step={1} value={Math.min(max, Math.max(target ? 1 : 0, number))} onChange={event => onChange(event.target.value)} aria-label={ru ? `${label} — ползунок` : `${label} slider`}/>
-    <div className="rating-scale"><span>{target ? 1 : 0}</span><span>{new Intl.NumberFormat(ru ? "ru-RU" : "en-US").format(max)}</span></div>
+    <div className="rating-value"><input id={id} type="number" min={min} max={max} step={1} inputMode="numeric" value={value} onChange={event => onChange(event.target.value)} aria-describedby="rating-limits" placeholder={platform === "premier" ? (target ? "10000" : "4500") : (target ? "1500" : "1000")}/><small>{platform === "premier" ? (ru ? "РЕЙТИНГ" : "RATING") : "ELO"}</small></div>
+    <input className="rating-slider" type="range" min={min} max={max} step={1} value={Math.min(max, Math.max(min, number))} onChange={event => onChange(event.target.value)} aria-describedby="rating-limits" aria-label={ru ? `${label} — ползунок` : `${label} slider`}/>
+    <div className="rating-scale"><span>{new Intl.NumberFormat(ru ? "ru-RU" : "en-US").format(min)}</span><span>{new Intl.NumberFormat(ru ? "ru-RU" : "en-US").format(max)}</span></div>
   </div>;
 }
 

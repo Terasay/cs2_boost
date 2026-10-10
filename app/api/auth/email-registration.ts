@@ -4,7 +4,7 @@ import { getDb } from "@/db";
 import { emailVerifications, users } from "@/db/schema";
 import { cleanAttribution } from "@/lib/attribution.mjs";
 import { ratingValue } from "@/lib/order-validation";
-import { normalizePromo } from "@/lib/pricing.mjs";
+import { normalizePromo, validateRatings } from "@/lib/pricing.mjs";
 import { publicOrigin } from "@/lib/server-config.mjs";
 import { mailConfig, sendEmail, verificationLetter } from "@/lib/mail.mjs";
 import { jsonInput, privateJson } from "../request-security";
@@ -20,7 +20,9 @@ function registrationDraft(input: unknown) {
   if ((draft.platform !== "premier" && draft.platform !== "faceit") || (draft.method !== "duo" && draft.method !== "piloted") || (draft.service !== "rating" && draft.service !== "calibration")) return null;
   const current = draft.service === "rating" ? ratingValue(draft.current) : null;
   const target = draft.service === "rating" ? ratingValue(draft.target) : null;
-  if (draft.service === "rating" && (current === null || target === null || target <= current)) return null;
+  if (draft.service === "rating") {
+    try { validateRatings(draft.platform, current, target); } catch { return null; }
+  }
   let promoCode: string | null;
   try { promoCode = normalizePromo(draft.promoCode); } catch { return null; }
   return { platform: draft.platform, service: draft.service, method: draft.method, current, target, redTrust: draft.platform === "premier" && draft.redTrust === true, promoCode };

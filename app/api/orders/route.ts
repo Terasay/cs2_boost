@@ -54,7 +54,7 @@ async function POSTHandler(request: Request) {
   if (service === "rating") {
     currentRating = ratingValue(input.current);
     targetRating = ratingValue(input.target);
-    if (currentRating === null || targetRating === null || currentRating < 0 || targetRating <= currentRating || targetRating > 100000) return fail("Enter valid ratings");
+    if (currentRating === null || targetRating === null) return fail("Enter valid ratings");
   }
   const retry = await chargeAttempt(await rateKey("order", null, user.id), 10, 60 * 60_000);
   if (retry) return fail("Too many requests. Try again later", 429);

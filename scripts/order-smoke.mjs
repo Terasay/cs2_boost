@@ -39,6 +39,22 @@ try {
   await call("/api/orders",client.cookie,{platform:"faceit",service:"rating",method:"duo",current:1000,target:1100,riskAccepted:true,redTrust:true},400);
   await call("/api/orders",client.cookie,{platform:"premier",service:"rating",method:"duo",current:1000,target:2000,riskAccepted:true,promoCode:"unknown"},400);
   await call("/api/orders",client.cookie,{platform:"premier",service:"rating",method:"duo",current:1000,target:2000,riskAccepted:true,expectedTotalAmount:1},409);
+  const countBeforeLimits = db.prepare("SELECT count(*) AS n FROM orders").get().n;
+  for (const [platform, current, target, error] of [
+    ["premier", 4500, 4799, "Premier boost must add at least 300 rating"],
+    ["premier", 22700, 23001, "Premier target cannot exceed 23000 rating"],
+    ["faceit", 1000, 1029, "FACEIT boost must add at least 30 ELO"],
+    ["faceit", 1970, 2001, "FACEIT target cannot exceed 2000 ELO"],
+  ]) {
+    const rejected = await call("/api/orders", client.cookie, {platform, service:"rating", method:"duo", current, target, riskAccepted:true}, 400);
+    assert.equal(rejected.data.error, error);
+  }
+  assert.equal(db.prepare("SELECT count(*) AS n FROM orders").get().n, countBeforeLimits);
+  for (const [platform, current, target, amount] of [["premier", 0, 300, 15000], ["premier", 22700, 23000, 21000], ["faceit", 0, 30, 15000], ["faceit", 1970, 2000, 21000]]) {
+    const accepted = await call("/api/orders", client.cookie, {platform, service:"rating", method:"duo", current, target, riskAccepted:true, expectedTotalAmount:amount}, 201);
+    const stored = db.prepare("SELECT total_amount AS amount, duration_days AS days FROM orders WHERE id=?").get(accepted.data.id);
+    assert.deepEqual(stored, {amount, days:1});
+  }
   const id=await create();let detail=await get(id);assert.equal(detail.order.totalAmount,88000);assert.equal(detail.order.commissionAmount,17600);assert.equal(detail.order.status,"new");assert.equal(detail.order.initialTotalAmount,88000);assert.equal(detail.order.durationDays,2);
   await call(`/api/orders/${id}/access`,client.cookie,{action:"submit",login:"secret",password:"GamePassword",confirmed:true,updatedAt:detail.order.updatedAt},409);
   await patch(id,"confirm_payment",{receivedAmount:88000,confirmed:true},409);

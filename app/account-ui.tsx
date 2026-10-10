@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { readStorage } from "@/lib/browser-storage";
 import { ratingValue } from "@/lib/order-validation";
+import { pricingErrorMessage } from "@/lib/pricing.mjs";
 import { Brand } from "./tactical-ui";
 
 export type User = { id: string; email: string; role: "client" | "admin"; twoFactorEnabled?: boolean };
@@ -35,6 +36,18 @@ export class ApiError extends Error {
 }
 
 const errorMessages: Record<string, string> = {
+  "DonationAlerts test mode is disabled": "Включите DONATIONALERTS_MODE=test на сервере и перезапустите сайт.",
+  "DonationAlerts OAuth is not configured": "Заполните Client ID и Client Secret DonationAlerts в настройках сервера.",
+  "Connect DonationAlerts first": "Сначала подключите аккаунт DonationAlerts.",
+  "DonationAlerts API is unavailable": "API DonationAlerts недоступен. Повторите проверку позже.",
+  "DonationAlerts authorization expired. Reconnect the account": "Авторизация DonationAlerts истекла. Подключите аккаунт заново.",
+  "Choose an accepted unpaid RUB order": "Выберите принятый неоплаченный заказ в рублях.",
+  "Wait 30 seconds before checking DonationAlerts again": "Подождите 30 секунд перед следующей проверкой API.",
+  "Run a simulation before replaying it": "Сначала запустите имитацию уведомления.",
+  "Payment test not found": "Тестовый счёт не найден.",
+  "Invalid payment test": "Проверьте параметры теста.",
+  "Payment test failed": "Не удалось выполнить тест оплаты. Повторите позже.",
+  "DonationAlerts connection changed. Try again": "Подключение DonationAlerts изменилось. Повторите проверку.",
   "Two-factor protection is not configured": "Двухфакторная защита пока не настроена на сервере.",
   "Two-factor protection is already enabled": "Двухфакторная защита уже включена. Обновите страницу.",
   "Two-factor protection is not enabled": "Двухфакторная защита ещё не включена.",
@@ -75,7 +88,6 @@ const errorMessages: Record<string, string> = {
   "Price and deadline are required for a quote": "Для предложения укажите цену и дату завершения.",
   "Invalid price": "Укажите корректную положительную сумму.",
   "Invalid deadline": "Укажите существующую дату завершения.",
-  "Enter valid ratings": "Укажите целый рейтинг от 0 до 100 000. Цель должна быть выше текущего.",
   "Message must be 1–2000 characters": "Сообщение должно содержать от 1 до 2000 символов.",
 };
 
@@ -88,7 +100,7 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   if (!response.ok || !data) {
     const message = typeof data?.error === "string" ? data.error : "Request failed";
     const fallback = response.status === 429 ? "Слишком много попыток. Попробуйте немного позже." : response.status === 403 ? "У этого аккаунта нет доступа к действию." : "Не удалось выполнить запрос. Попробуйте ещё раз.";
-    throw new ApiError(ru ? errorMessages[message] ?? fallback : message, response.status);
+    throw new ApiError(ru ? errorMessages[message] ?? pricingErrorMessage(message) ?? fallback : message, response.status);
   }
   return data;
 }

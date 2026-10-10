@@ -141,3 +141,39 @@ export const supportMessages = sqliteTable("support_messages", {
   body: text("body").notNull(),
   createdAt: integer("created_at").notNull(),
 }, table => [index("support_messages_thread_created_idx").on(table.threadId, table.createdAt)]);
+
+export const donationConnections = sqliteTable("donation_connections", {
+  id: text("id").primaryKey(),
+  secret: text("secret"),
+  accountId: text("account_id"),
+  code: text("code"),
+  name: text("name"),
+  stateHash: text("state_hash"),
+  stateActor: text("state_actor").references(() => users.id),
+  stateExpiresAt: integer("state_expires_at"),
+  revision: integer("revision").notNull().default(0),
+});
+
+export const donationTests = sqliteTable("donation_tests", {
+  id: text("id").primaryKey(),
+  reference: text("reference").notNull().unique(),
+  actorId: text("actor_id").notNull().references(() => users.id),
+  orderId: text("order_id").references(() => orders.id, { onDelete: "cascade" }),
+  orderRevision: integer("order_revision"),
+  amount: integer("amount").notNull(),
+  currency: text("currency").notNull().default("RUB"),
+  status: text("status", { enum: ["pending", "matched"] }).notNull().default("pending"),
+  matchedAt: integer("matched_at"),
+  createdAt: integer("created_at").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+}, table => [index("donation_tests_created_idx").on(table.createdAt)]);
+
+export const donationTestEvents = sqliteTable("donation_test_events", {
+  id: text("id").primaryKey(),
+  testId: text("test_id").notNull().references(() => donationTests.id, { onDelete: "cascade" }),
+  source: text("source", { enum: ["simulation", "api"] }).notNull(),
+  result: text("result").notNull(),
+  amount: integer("amount").notNull(),
+  currency: text("currency").notNull(),
+  createdAt: integer("created_at").notNull(),
+}, table => [index("donation_test_events_test_idx").on(table.testId, table.createdAt)]);

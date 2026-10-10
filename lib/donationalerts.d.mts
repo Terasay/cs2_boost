@@ -1,0 +1,12 @@
+export type DonationConfig = { enabled: boolean; clientId: string; clientSecret: string; account: string };
+export type DonationTokens = { accessToken: string; refreshToken: string | null; expiresAt: number };
+export type Donation = { id: string; reference: string; amount: number; currency: string };
+export function donationConfig(): DonationConfig;
+export const donationScopes: string;
+export function donationAuthorization(config: DonationConfig, callback: string, state: string): string;
+export function donationToken(config: DonationConfig, grant: Record<string, string>, fetcher?: typeof fetch): Promise<DonationTokens>;
+export function donationProfile(token: string, expectedAccount?: string, fetcher?: typeof fetch): Promise<{ accountId: string; code: string; name: string }>;
+export function donationPage(token: string, page?: number, fetcher?: typeof fetch): Promise<{ donations: unknown[]; hasMore: boolean }>;
+export function donationMinorAmount(value: unknown): number | null;
+export function normalizeDonation(value: unknown): Donation | null;
+export function donationMatch(invoice: { reference: string; status: string; amount: number; currency: string; expiresAt: number }, donation: Donation, now?: number): string;

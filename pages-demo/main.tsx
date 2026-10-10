@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { z } from "zod";
 import { readStorage, writeStorage } from "../lib/browser-storage";
+import { pricingErrorMessage, validateRatings } from "../lib/pricing.mjs";
 import { createRoot } from "react-dom/client";
 import { ArrowRight, Check, ChevronRight, Headset, LockKeyhole, LogOut, Menu, MessageCircle, ShieldCheck, Target, UserRound, X } from "lucide-react";
 import "./style.css";
@@ -112,6 +113,7 @@ function App() {
   }
 
   function createOrder(email: string, source = data) {
+    if (!validDraft()) return;
     const order: Order = {
       id: crypto.randomUUID().slice(0, 8).toUpperCase(),
       clientEmail: email,
@@ -133,12 +135,19 @@ function App() {
     go(`order/${order.id}`);
   }
 
+  function validDraft() {
+    if (draft.calibration) return true;
+    if (!draft.target.trim()) { setError(t("Укажите целевой рейтинг.", "Enter a target rating.")); return false; }
+    if (!draft.current.trim()) { setError(t("Укажите текущий рейтинг.", "Enter a current rating.")); return false; }
+    try { validateRatings(draft.platform, Number(draft.current), Number(draft.target)); }
+    catch (reason) { setError(reason instanceof Error ? pricingErrorMessage(reason.message, lang) ?? t("Проверьте рейтинг.", "Check the rating.") : t("Проверьте рейтинг.", "Check the rating.")); return false; }
+    return true;
+  }
+
   function submitRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    if (!draft.calibration && !draft.target.trim()) { setError(t("Укажите целевой рейтинг.", "Enter a target rating.")); return; }
-    if (!draft.calibration && !draft.current.trim()) { setError(t("Укажите текущий рейтинг.", "Enter a current rating.")); return; }
-    if(!draft.calibration && (!Number.isInteger(Number(draft.current)) || !Number.isInteger(Number(draft.target)) || Number(draft.current)<0 || Number(draft.target)>100000 || Number(draft.target)<=Number(draft.current))){setError(t("Укажите целые рейтинги от 0 до 100 000. Цель должна быть выше текущего.","Enter whole ratings from 0 to 100,000. The target must be higher."));return;}
+    if (!validDraft()) return;
     if (session?.role === "client") createOrder(session.email);
     else go("register");
   }

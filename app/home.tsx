@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { readStorage, writeStorage } from "@/lib/browser-storage";
-import { calculatePrice, type Price } from "@/lib/pricing.mjs";
+import { calculatePrice, pricingErrorMessage, ratingLimits, type Price } from "@/lib/pricing.mjs";
 import { PriceSummary, PromoInput } from "./price-summary";
 import { api, readDraft } from "./account-ui";
 import Image from "next/image";
@@ -74,7 +74,7 @@ export default function Home({ lang, initialPlatform = "premier", initialService
   let price: Price | null = null;
   let priceProblem = "";
   try { if(service === "calibration" || (current && target))price = calculatePrice({platform,service,current:Number(current),target:Number(target),redTrust:platform === "premier" && redTrust,promoCode}); }
-  catch(reason) { priceProblem = reason instanceof Error && reason.message === "Unknown promo code" ? (lang === "ru" ? "Исправьте промокод или удалите его, чтобы рассчитать стоимость." : "Correct or remove the promo code to calculate the price.") : t.invalid; }
+  catch(reason) { priceProblem = reason instanceof Error ? pricingErrorMessage(reason.message, lang) ?? t.invalid : t.invalid; }
   useEffect(()=>{
     if(window.matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window))return;
     const elements=document.querySelectorAll<HTMLElement>(".tactical-section .section-heading,.service-module,.playing-card,.account-preview,.showcase-copy,.process-rail,.faq-layout>div");
@@ -107,9 +107,8 @@ export default function Home({ lang, initialPlatform = "premier", initialService
   }
   function next(){
     const start=Number(current),end=Number(target);
-    if(service==="rating"&&(!current||!target||!Number.isInteger(start)||!Number.isInteger(end)||start<0||end<=start||end>100000)){setError(t.invalid);return}
     setError("");
-    if(!price){setError(lang==="ru"?"Проверьте рейтинг и промокод.":"Check the ratings and promo code.");return}
+    if(!price){setError(priceProblem || (lang==="ru"?"Проверьте рейтинг и промокод.":"Check the ratings and promo code."));return}
     if(!writeStorage("sessionStorage","cs2-draft",JSON.stringify({platform,service,method,current:service==="rating"?start:null,target:service==="rating"?end:null,redTrust:platform==="premier"&&redTrust,promoCode:price.promoCode}))){setError(lang==="ru"?"Разрешите хранение данных в браузере, чтобы продолжить оформление.":"Allow browser storage to continue your request.");return}
     window.location.assign("/register");
   }
@@ -134,7 +133,7 @@ export default function Home({ lang, initialPlatform = "premier", initialService
             <div className="platform-selector" id="calculator-platform" role="group" aria-label={t.platform}><button type="button" className={platform === "premier" ? "platform-card selected" : "platform-card"} aria-pressed={platform === "premier"} onClick={()=>changePlatform("premier")}><span className="platform-symbol"><Crosshair size={28}/></span><span><strong>PREMIER</strong><small>CS2 MATCHMAKING</small></span><span className="selection-square">{platform === "premier" && <Check size={12}/>}</span></button><button type="button" className={platform === "faceit" ? "platform-card selected" : "platform-card"} aria-pressed={platform === "faceit"} onClick={()=>changePlatform("faceit")}><span className="platform-symbol faceit-symbol"><ArrowUpRight size={30}/></span><span><strong>FACEIT</strong><small>ELO BOOST</small></span><span className="selection-square">{platform === "faceit" && <Check size={12}/>}</span></button></div>
             <div className="config-options"><div><span className="config-label">{t.service}</span><div className="tactical-toggle" role="group" aria-label={t.service}><button type="button" aria-pressed={service === "rating"} className={service === "rating" ? "selected" : ""} onClick={()=>{setService("rating");setError("")}}>{t.rating}</button><button type="button" aria-pressed={service === "calibration"} className={service === "calibration" ? "selected" : ""} onClick={()=>{setService("calibration");setError("")}}>{t.calibration}</button></div></div><div><span className="config-label">{t.method}</span><div className="tactical-toggle" id="calculator-method" role="group" aria-label={t.method}><button type="button" aria-pressed={method === "duo"} className={method === "duo" ? "selected" : ""} onClick={()=>setMethod("duo")}><UsersRound size={15}/>DUO</button><button type="button" aria-pressed={method === "piloted"} className={method === "piloted" ? "selected" : ""} onClick={()=>setMethod("piloted")}><LockKeyhole size={15}/>PILOTED</button></div></div></div>
             <div className="config-section-label"><span>02 / {lang === "ru" ? "ВАША ЦЕЛЬ" : "YOUR TARGET"}</span><span>{service === "rating" ? (platform === "premier" ? "RATING" : "ELO") : "CALIBRATION"}</span></div>
-            {service === "rating" ? <div className="rating-modules"><RatingControl id="current" label={t.current} value={current} onChange={setCurrent} platform={platform} ru={lang === "ru"}/><RatingControl id="target" label={t.target} value={target} onChange={setTarget} platform={platform} target ru={lang === "ru"}/></div> : <div className="calibration-module"><Crosshair size={32}/><div><h3>{lang === "ru" ? "Начните с калибровки" : "Start with calibration"}</h3><p>{t.calibrationHint}</p></div></div>}
+            {service === "rating" ? <><div className="rating-modules"><RatingControl id="current" label={t.current} value={current} onChange={setCurrent} platform={platform} ru={lang === "ru"}/><RatingControl id="target" label={t.target} value={target} onChange={setTarget} platform={platform} target minimum={Math.max(0, Math.ceil(Number(current) || 0)) + ratingLimits[platform].minIncrease} ru={lang === "ru"}/></div><p className="tariff-note" id="rating-limits">{platform === "premier" ? (lang === "ru" ? "Цель до 23 000 рейтинга · минимальный прирост 300." : "Target up to 23,000 rating · minimum increase 300.") : (lang === "ru" ? "Цель до 2 000 ELO · минимальный прирост 30 ELO." : "Target up to 2,000 ELO · minimum increase 30 ELO.")}</p></> : <div className="calibration-module"><Crosshair size={32}/><div><h3>{lang === "ru" ? "Начните с калибровки" : "Start with calibration"}</h3><p>{t.calibrationHint}</p></div></div>}
             {platform === "premier" && <label className={`trust-check${redTrust ? " active" : ""}`}><input type="checkbox" checked={redTrust} onChange={event=>setRedTrust(event.target.checked)}/><span>{lang === "ru" ? "На аккаунте красный траст" : "Red trust on this account"}</span><b>+10%</b></label>}
             {service === "rating" && <><div className="config-tariff"><span>{lang === "ru" ? "БАЗОВЫЙ ТАРИФ" : "BASE RATE"}</span><strong>{price?.rate ?? (Number(current) > (platform === "premier" ? 10000 : 1200) ? 700 : 500)} ₽ <small>/ {platform === "premier" ? (lang === "ru" ? "1 000 рейтинга" : "1,000 rating") : "100 ELO"}</small></strong></div>
             <p className="tariff-note">{platform === "premier" ? (lang === "ru" ? "Выше 10 000 на старте — 700 ₽ за 1 000 рейтинга." : "Starting above 10,000: 700 RUB per 1,000 rating.") : (lang === "ru" ? "Выше 1 200 ELO на старте — 700 ₽ за 100 ELO." : "Starting above 1,200: 700 RUB per 100 ELO.")} {lang === "ru" ? "Неполный шаг — пропорционально, срок округляется до дня." : "Partial steps are priced proportionally; time rounds up to a day."}</p></>}

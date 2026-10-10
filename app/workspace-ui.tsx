@@ -1,13 +1,13 @@
 "use client";
 
-import { BarChart3, ChevronLeft, ChevronRight, ListFilter, MessagesSquare, Settings2, TicketPercent } from "lucide-react";
+import { BarChart3, ChevronLeft, ChevronRight, CreditCard, ListFilter, MessagesSquare, Settings2, TicketPercent } from "lucide-react";
 
-export function WorkspaceNav({ active, ru, admin = true }: { active: "orders" | "inbox" | "promos" | "analytics" | "account" | "support"; ru: boolean; admin?: boolean }) {
+export function WorkspaceNav({ active, ru, admin = true }: { active: "orders" | "inbox" | "promos" | "analytics" | "account" | "support" | "payments"; ru: boolean; admin?: boolean }) {
   return <nav className="workspace-nav" aria-label={ru ? (admin ? "Администрирование" : "Личный кабинет") : (admin ? "Administration" : "Account")}>
     <a className={active === "orders" ? "active" : ""} href="/dashboard" aria-current={active === "orders" ? "page" : undefined}><ListFilter size={17}/>{ru ? "Заказы" : "Orders"}</a>
     {admin ? <><a className={active === "inbox" ? "active" : ""} href="/inbox" aria-current={active === "inbox" ? "page" : undefined}><MessagesSquare size={17}/>{ru ? "Входящие" : "Inbox"}</a>
     <a className={active === "promos" ? "active" : ""} href="/promos" aria-current={active === "promos" ? "page" : undefined}><TicketPercent size={17}/>{ru ? "Промокоды" : "Promo codes"}</a>
-    <a className={active === "analytics" ? "active" : ""} href="/analytics" aria-current={active === "analytics" ? "page" : undefined}><BarChart3 size={17}/>{ru ? "Источники" : "Sources"}</a></> : <a className={active === "support" ? "active" : ""} href="/support" aria-current={active === "support" ? "page" : undefined}><MessagesSquare size={17}/>{ru ? "Поддержка" : "Support"}</a>}
+    <a className={active === "analytics" ? "active" : ""} href="/analytics" aria-current={active === "analytics" ? "page" : undefined}><BarChart3 size={17}/>{ru ? "Источники" : "Sources"}</a><a className={active === "payments" ? "active" : ""} href="/payments" aria-current={active === "payments" ? "page" : undefined}><CreditCard size={17}/>{ru ? "Оплата / тест" : "Payments / test"}</a></> : <a className={active === "support" ? "active" : ""} href="/support" aria-current={active === "support" ? "page" : undefined}><MessagesSquare size={17}/>{ru ? "Поддержка" : "Support"}</a>}
     <a className={active === "account" ? "active" : ""} href="/account" aria-current={active === "account" ? "page" : undefined}><Settings2 size={17}/>{ru ? "Настройки" : "Settings"}</a>
   </nav>;
 }

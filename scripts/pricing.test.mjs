@@ -24,9 +24,20 @@ test("red trust before discount, owner share after discount, and fractional unit
   assert.equal(standard.totalAmount,80000);assert.equal(standard.commissionAmount,16000);
   assert.equal(quote("premier",4500,10000).totalAmount,275000);
   assert.equal(quote("premier",4500,10000).durationDays,6);
-  assert.equal(quote("premier",0,1).totalAmount,50);
+  assert.equal(quote("premier",0,300).totalAmount,15000);
   assert.equal(quote("faceit",1500,1551).totalAmount,35700);
   assert.equal(quote("faceit",1500,1551).durationDays,1);
+});
+
+test("minimum increases and maximum targets are enforced on both platforms", () => {
+  for (const [platform, minimum, maximum] of [["premier", 300, 23000], ["faceit", 30, 2000]]) {
+    assert.equal(quote(platform, 0, minimum).totalAmount, 15000);
+    assert.equal(quote(platform, maximum - minimum, maximum).totalAmount, 21000);
+    assert.throws(() => quote(platform, 0, minimum - 1), /must add at least/);
+    assert.throws(() => quote(platform, maximum - minimum + 1, maximum), /must add at least/);
+    assert.throws(() => quote(platform, maximum - minimum, maximum + 1), /cannot exceed/);
+    assert.throws(() => quote(platform, maximum, maximum + minimum), /cannot exceed/);
+  }
 });
 
 test("unknown promo codes, invalid ratings, and Faceit trust flags are rejected", () => {

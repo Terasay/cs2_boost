@@ -3,8 +3,10 @@ import { openDatabase } from "../db/connection.mjs";
 import { mailConfig } from "../lib/mail.mjs";
 import { accessKey } from "../lib/order-access.mjs";
 import { openSecret, twoFactorKey } from "../lib/two-factor.mjs";
+import { donationConfig } from "../lib/donationalerts.mjs";
 
 publicOrigin(new Request("http://127.0.0.1:3000"));
+donationConfig();
 if (process.env.TRUST_PROXY !== "1") throw new Error("The VPS service requires TRUST_PROXY=1 and Nginx on the same server");
 const database = openDatabase();
 try {
