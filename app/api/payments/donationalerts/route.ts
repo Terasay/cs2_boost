@@ -11,7 +11,7 @@ import { jsonInput, privateJson, safeApi, sameOriginMutation } from "../../reque
 import { connectionId, createPaymentTest, paymentTestStatus, processTestDonation, requireDonationTest, stateDigest, syncPaymentTests } from "./service";
 
 const fail = (error: string, status = 400) => privateJson({ error }, status);
-const expectedErrors = new Set(["DonationAlerts test mode is disabled", "DonationAlerts only supports off or test mode", "DonationAlerts OAuth is not configured", "Secure access is not configured", "Order not found", "Choose an accepted unpaid RUB order", "Invalid price", "Connect DonationAlerts first", "DonationAlerts API is unavailable", "DonationAlerts authorization expired. Reconnect the account", "DonationAlerts connection changed. Try again"]);
+const expectedErrors = new Set(["DonationAlerts test mode is disabled", "Invalid DonationAlerts mode", "DonationAlerts OAuth is not configured", "Secure access is not configured", "Order not found", "Choose an accepted unpaid RUB order", "Invalid price", "Connect DonationAlerts first", "Connect the configured DonationAlerts account", "DonationAlerts API is unavailable", "DonationAlerts authorization expired. Reconnect the account", "DonationAlerts connection changed. Try again"]);
 async function GETHandler(request: Request) {
   const user = await getCurrentUser(request);
   if (!user) return fail("Sign in required", 401);
@@ -30,6 +30,7 @@ async function POSTHandler(request: Request) {
   try {
     const config = requireDonationTest();
     const db = getDb();
+    if (["create", "simulate"].includes(String(input.action)) && config.mode !== "test") return fail("Switch to test mode to run simulations", 409);
     if (input.action === "create") return privateJson({ test: createPaymentTest(user.id, input) }, 201);
     if (input.action === "connect") {
       accessKey();

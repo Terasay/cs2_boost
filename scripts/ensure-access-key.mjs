@@ -5,7 +5,7 @@ const path = process.argv[2] || "/etc/cs2-boost.env";
 if (lstatSync(path).isSymbolicLink()) throw new Error("Environment file must not be a symlink");
 const source = readFileSync(path, "utf8");
 let updated = source;
-for (const name of ["ORDER_ACCESS_KEY", "TWO_FACTOR_KEY"]) {
+for (const name of ["ORDER_ACCESS_KEY", "TWO_FACTOR_KEY", "PAYMENTS_SYNC_KEY"]) {
   const lines = updated.split(/\r?\n/);
   const matching = lines.filter(line => line.startsWith(`${name}=`));
   if (matching.length > 1) throw new Error(`Duplicate ${name} entries`);

@@ -7,11 +7,12 @@ const config = { enabled: true, clientId: "42", clientSecret: "private-test-secr
 const invoice = { reference, status: "pending", amount: 50001, currency: "RUB", expiresAt: 2000 };
 const fixture = { id: 123, name: "donation", message_type: "text", message: reference, amount: 500.01, currency: "RUB" };
 
-test("test mode is opt-in and a live mode cannot be enabled", () => {
+test("explicit modes distinguish simulations from order matching", () => {
   const previous = process.env.DONATIONALERTS_MODE;
   try {
     delete process.env.DONATIONALERTS_MODE; assert.equal(donationConfig().enabled, false);
     process.env.DONATIONALERTS_MODE = "test"; assert.equal(donationConfig().enabled, true);
+    process.env.DONATIONALERTS_MODE = "orders"; assert.equal(donationConfig().mode, "orders");
     process.env.DONATIONALERTS_MODE = "live"; assert.throws(donationConfig);
   } finally { if (previous === undefined) delete process.env.DONATIONALERTS_MODE; else process.env.DONATIONALERTS_MODE = previous; }
 });

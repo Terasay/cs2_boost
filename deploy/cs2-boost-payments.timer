@@ -1,0 +1,11 @@
+[Unit]
+Description=Check CS2 Boost payment alerts every minute
+
+[Timer]
+OnBootSec=60
+OnUnitInactiveSec=60
+AccuracySec=5
+Unit=cs2-boost-payments.service
+
+[Install]
+WantedBy=timers.target

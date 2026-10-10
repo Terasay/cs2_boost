@@ -6,7 +6,8 @@ import { openSecret, twoFactorKey } from "../lib/two-factor.mjs";
 import { donationConfig } from "../lib/donationalerts.mjs";
 
 publicOrigin(new Request("http://127.0.0.1:3000"));
-donationConfig();
+const payments = donationConfig();
+if (payments.mode === "orders" && (!payments.account || !/^[a-f0-9]{64}$/i.test(process.env.PAYMENTS_SYNC_KEY || ""))) throw new Error("Configure the expected DonationAlerts account and PAYMENTS_SYNC_KEY");
 if (process.env.TRUST_PROXY !== "1") throw new Error("The VPS service requires TRUST_PROXY=1 and Nginx on the same server");
 const database = openDatabase();
 try {

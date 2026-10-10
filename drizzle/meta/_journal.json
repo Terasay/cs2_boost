@@ -71,6 +71,13 @@
       "when": 1791584150114,
       "tag": "0009_donationalerts_tests",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1791634975616,
+      "tag": "0010_round_hitman",
+      "breakpoints": true
     }
   ]
 }

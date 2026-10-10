@@ -116,6 +116,8 @@ export const orderAccess = sqliteTable("order_access", {
   payload: text("payload").notNull(),
   createdAt: integer("created_at").notNull(),
   expiresAt: integer("expires_at").notNull(),
+  receivedAt: integer("received_at"),
+  receivedBy: text("received_by").references(() => users.id),
 }, table => [index("order_access_expiry_idx").on(table.expiresAt)]);
 
 export const messages = sqliteTable("messages", {
@@ -123,6 +125,7 @@ export const messages = sqliteTable("messages", {
   orderId: text("order_id").notNull().references(() => orders.id),
   senderId: text("sender_id").notNull().references(() => users.id),
   body: text("body").notNull(),
+  encrypted: integer("encrypted", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at").notNull(),
 }, table => [index("messages_order_created_idx").on(table.orderId, table.createdAt, table.id)]);
 
@@ -139,6 +142,7 @@ export const supportMessages = sqliteTable("support_messages", {
   threadId: text("thread_id").notNull().references(() => supportThreads.id),
   senderId: text("sender_id").notNull().references(() => users.id),
   body: text("body").notNull(),
+  encrypted: integer("encrypted", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at").notNull(),
 }, table => [index("support_messages_thread_created_idx").on(table.threadId, table.createdAt)]);
 
@@ -177,3 +181,28 @@ export const donationTestEvents = sqliteTable("donation_test_events", {
   currency: text("currency").notNull(),
   createdAt: integer("created_at").notNull(),
 }, table => [index("donation_test_events_test_idx").on(table.testId, table.createdAt)]);
+
+export const paymentIntents = sqliteTable("payment_intents", {
+  id: text("id").primaryKey(),
+  orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  reference: text("reference").notNull().unique(),
+  accountId: text("account_id").notNull(),
+  accountCode: text("account_code").notNull(),
+  orderRevision: integer("order_revision").notNull(),
+  amount: integer("amount").notNull(),
+  currency: text("currency").notNull(),
+  status: text("status", { enum: ["pending", "review", "confirmed", "void"] }).notNull().default("pending"),
+  matchedAt: integer("matched_at"),
+  confirmedAt: integer("confirmed_at"),
+  createdAt: integer("created_at").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+}, table => [index("payment_intents_order_idx").on(table.orderId, table.createdAt), index("payment_intents_status_idx").on(table.status, table.createdAt)]);
+
+export const paymentReceipts = sqliteTable("payment_receipts", {
+  id: text("id").primaryKey(),
+  intentId: text("intent_id").notNull().references(() => paymentIntents.id, { onDelete: "cascade" }),
+  amount: integer("amount").notNull(),
+  currency: text("currency").notNull(),
+  result: text("result").notNull(),
+  createdAt: integer("created_at").notNull(),
+}, table => [index("payment_receipts_intent_idx").on(table.intentId, table.createdAt)]);

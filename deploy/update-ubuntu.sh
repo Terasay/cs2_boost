@@ -51,9 +51,12 @@ if [[ "$install_dependencies" -eq 1 ]]; then
 fi
 as_app env NODE_OPTIONS=--max-old-space-size=512 npm run build
 install -d -m 700 -o cs2boost -g cs2boost /opt/cs2-boost/.next/cache
-as_app env NODE_ENV=production node scripts/migrate.mjs
+as_app env NODE_ENV=production node --env-file=/etc/cs2-boost.env scripts/migrate.mjs
 as_app env NODE_ENV=production node --env-file=/etc/cs2-boost.env scripts/check-config.mjs
 systemctl start cs2-boost
+install -m 644 deploy/cs2-boost-payments.service deploy/cs2-boost-payments.timer /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now cs2-boost-payments.timer
 curl --fail --retry 10 --retry-connrefused --retry-delay 2 http://127.0.0.1:3000/api/health
 if [[ "$clean_cache" -eq 1 ]]; then
     as_app npm cache clean --force

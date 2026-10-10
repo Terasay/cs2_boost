@@ -35,7 +35,7 @@ test("fresh migrations, admin promotion, and consistent database backup", () => 
     try {
       assert.equal(restored.pragma("integrity_check", { simple: true }), "ok");
       assert.equal(restored.prepare("SELECT role FROM users WHERE id = ?").get(id).role, "admin");
-      assert.equal(restored.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, 9);
+      assert.equal(restored.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, JSON.parse(readFileSync("drizzle/meta/_journal.json","utf8")).entries.length);
     } finally { restored.close(); }
   } finally { database.close(); }
 });

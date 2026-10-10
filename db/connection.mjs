@@ -19,6 +19,7 @@ export function openDatabase({ mustExist = true } = {}) {
     database.pragma("foreign_keys = ON");
     database.pragma("journal_mode = WAL");
     database.pragma("synchronous = FULL");
+    database.pragma("secure_delete = ON");
     return database;
   } catch (error) {
     database.close();

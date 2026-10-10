@@ -75,13 +75,14 @@ runuser -u cs2boost -- env PATH="$PATH" NODE_ENV=production DATABASE_PATH=/var/l
 
 install -m 640 -o root -g cs2boost deploy/cs2-boost.env /etc/cs2-boost.env
 node scripts/ensure-access-key.mjs /etc/cs2-boost.env
-install -m 644 deploy/cs2-boost.service deploy/cs2-boost-backup.service deploy/cs2-boost-backup.timer /etc/systemd/system/
+install -m 644 deploy/cs2-boost.service deploy/cs2-boost-backup.service deploy/cs2-boost-backup.timer deploy/cs2-boost-payments.service deploy/cs2-boost-payments.timer /etc/systemd/system/
 install -m 644 deploy/nginx.conf /etc/nginx/sites-available/cs2-boost
 ln -s /etc/nginx/sites-available/cs2-boost /etc/nginx/sites-enabled/cs2-boost
 nginx -t
 systemctl daemon-reload
 systemctl enable --now cs2-boost
 systemctl enable --now cs2-boost-backup.timer
+systemctl enable --now cs2-boost-payments.timer
 systemctl enable nginx
 systemctl reload-or-restart nginx
 curl --fail --retry 10 --retry-connrefused --retry-delay 2 http://127.0.0.1:3000/api/health

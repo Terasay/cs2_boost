@@ -1,4 +1,4 @@
-export type DonationConfig = { enabled: boolean; clientId: string; clientSecret: string; account: string };
+export type DonationConfig = { mode: string; enabled: boolean; clientId: string; clientSecret: string; account: string };
 export type DonationTokens = { accessToken: string; refreshToken: string | null; expiresAt: number };
 export type Donation = { id: string; reference: string; amount: number; currency: string };
 export function donationConfig(): DonationConfig;

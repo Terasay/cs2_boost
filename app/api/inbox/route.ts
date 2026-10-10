@@ -4,6 +4,7 @@ import { messages, orders, supportMessages, supportThreads, users } from "@/db/s
 import { getCurrentUser } from "../auth/auth-lib";
 import { privateJson, safeApi } from "../request-security";
 import { listQuery, orderReply, supportReply, searchCondition } from "../list-query";
+import { openChat } from "@/lib/chat-vault.mjs";
 
 export const GET = safeApi(async request => {
   const user = await getCurrentUser(request);
@@ -25,13 +26,20 @@ export const GET = safeApi(async request => {
     id: orders.id, email: users.email, platform: orders.platform, service: orders.service, status: orders.status,
     createdAt: orders.createdAt, needsReply: orderReply,
     lastMessage: sql<string | null>`(select body from ${messages} where ${messages.orderId} = ${orders.id} order by ${messages.createdAt} desc, ${messages.id} desc limit 1)`,
+    lastMessageId: sql<string | null>`(select id from ${messages} where ${messages.orderId} = ${orders.id} order by ${messages.createdAt} desc, ${messages.id} desc limit 1)`,
+    encrypted: sql<number>`coalesce((select encrypted from ${messages} where ${messages.orderId} = ${orders.id} order by ${messages.createdAt} desc, ${messages.id} desc limit 1), 0)`,
     lastActivity: sql<number>`max(${orders.updatedAt}, coalesce((select max(${messages.createdAt}) from ${messages} where ${messages.orderId} = ${orders.id}), 0))`.as("last_activity"),
   }).from(orders).innerJoin(users, eq(orders.userId, users.id)).where(orderFilter).orderBy(desc(sql`last_activity`), desc(orders.id)).limit(query.pageSize).offset(offset).all();
   const supportChats = kind === "orders" ? [] : db.select({
     id: supportThreads.id, email: users.email, status: supportThreads.status, needsReply: supportReply,
     lastActivity: supportThreads.updatedAt,
     lastMessage: sql<string | null>`(select body from ${supportMessages} where ${supportMessages.threadId} = ${supportThreads.id} order by ${supportMessages.createdAt} desc, ${supportMessages.id} desc limit 1)`,
+    lastMessageId: sql<string | null>`(select id from ${supportMessages} where ${supportMessages.threadId} = ${supportThreads.id} order by ${supportMessages.createdAt} desc, ${supportMessages.id} desc limit 1)`,
+    encrypted: sql<number>`coalesce((select encrypted from ${supportMessages} where ${supportMessages.threadId} = ${supportThreads.id} order by ${supportMessages.createdAt} desc, ${supportMessages.id} desc limit 1), 0)`,
   }).from(supportThreads).innerJoin(users, eq(supportThreads.userId, users.id)).where(supportFilter).orderBy(desc(supportThreads.updatedAt), desc(supportThreads.id)).limit(query.pageSize).offset(offset).all();
-  return privateJson({ orderChats, supportChats, total, page, pages, pageSize: query.pageSize, totals: { orders: orderTotal, support: supportTotal } });
+  function decrypt<T extends { id: string; lastMessage: string | null; lastMessageId: string | null; encrypted: number }>(rows: T[], kind: "order" | "support") {
+    return rows.map(({ encrypted, lastMessageId, ...row }) => ({ ...row, lastMessage: row.lastMessage && lastMessageId ? openChat(kind, row.id, lastMessageId, row.lastMessage, encrypted) : null }));
+  }
+  return privateJson({ orderChats: decrypt(orderChats, "order"), supportChats: decrypt(supportChats, "support"), total, page, pages, pageSize: query.pageSize, totals: { orders: orderTotal, support: supportTotal } });
 });
 
