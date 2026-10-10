@@ -5,7 +5,7 @@ import { getCurrentUser } from "../auth/auth-lib";
 import { chargeAttempt, rateKey } from "../auth/rate-limit";
 import { jsonInput, privateJson, safeApi, sameOriginMutation } from "../request-security";
 
-import { readChatPage, saveChatMessage } from "../chat-history";
+import { readChatPage, saveChatMessage, validMessageId } from "../chat-history";
 
 const fail = (error: string, status = 400) => privateJson({ error }, status);
 
@@ -29,6 +29,7 @@ async function POSTHandler(request: Request) {
   if (!input) return fail("Invalid request");
   const body = typeof input.body === "string" ? input.body.trim() : "";
   if (!body || body.length > 2000) return fail("Message must be 1–2000 characters");
+  if (input.clientId !== undefined && !validMessageId(input.clientId)) return fail("Invalid request");
   const retry = await chargeAttempt(await rateKey("support-message", null, user.id), 30, 5 * 60_000);
   if (retry) return privateJson({ error: "Too many messages. Try again later" }, 429, { "Retry-After": String(retry) });
   const db = getDb();
@@ -36,7 +37,8 @@ async function POSTHandler(request: Request) {
   await db.insert(supportThreads).values({ id: crypto.randomUUID(), userId: user.id, status: "open", createdAt: now, updatedAt: now }).onConflictDoNothing();
   const [thread] = await db.select({ id: supportThreads.id }).from(supportThreads).where(eq(supportThreads.userId, user.id)).limit(1);
   if (!thread) return fail("Support unavailable", 503);
-  const message = saveChatMessage("support", thread.id, user.id, body);
+  const message = saveChatMessage("support", thread.id, user.id, body, input.clientId as string | undefined);
+  if (!message) return fail("Message reference already used", 409);
   return privateJson({ id: thread.id, message }, 201);
 }
 

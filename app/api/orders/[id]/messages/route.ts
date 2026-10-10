@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { orders } from "@/db/schema";
-import { saveChatMessage } from "../../../chat-history";
+import { saveChatMessage, validMessageId } from "../../../chat-history";
 import { getCurrentUser } from "../../../auth/auth-lib";
 import { chargeAttempt, rateKey } from "../../../auth/rate-limit";
 import { jsonInput, privateJson, safeApi, sameOriginMutation } from "../../../request-security";
@@ -17,9 +17,11 @@ async function POSTHandler(request: Request) {
   if (!input) return privateJson({ error: "Invalid request" }, 400);
   const body = typeof input.body === "string" ? input.body.trim() : "";
   if (!body || body.length > 2000) return privateJson({ error: "Message must be 1–2000 characters" }, 400);
+  if (input.clientId !== undefined && !validMessageId(input.clientId)) return privateJson({ error: "Invalid request" }, 400);
   const retry = await chargeAttempt(await rateKey("message", null, user.id), 30, 5 * 60_000);
   if (retry) return privateJson({ error: "Too many messages. Try again later" }, 429, { "Retry-After": String(retry) });
-  const message = saveChatMessage("order", id, user.id, body);
+  const message = saveChatMessage("order", id, user.id, body, input.clientId as string | undefined);
+  if (!message) return privateJson({ error: "Message reference already used" }, 409);
   return privateJson({ ok: true, message }, 201);
 }
 

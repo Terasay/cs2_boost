@@ -24,13 +24,23 @@ export async function readChatPage(kind: "order" | "support", parentId: string, 
   return { messages: page, nextCursor: after === null && rows.length > 50 ? `${page[0].createdAt}:${page[0].id}` : null, latestCursor: latest ? `${latest.createdAt}:${latest.id}` : null, hasMore: after !== null && rows.length > 50 };
 }
 
-export function saveChatMessage(kind: "order" | "support", parentId: string, senderId: string, body: string) {
+export const validMessageId = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value);
+
+export function saveChatMessage(kind: "order" | "support", parentId: string, senderId: string, body: string, clientId?: string) {
   const table = kind === "order" ? messages : supportMessages;
   const parent = kind === "order" ? messages.orderId : supportMessages.threadId;
   return getDb().transaction(tx => {
+    if (clientId) {
+      const existing = tx.select({ parentId: parent, id: table.id, senderId: table.senderId, body: table.body, encrypted: table.encrypted, createdAt: table.createdAt }).from(table).where(eq(table.id, clientId)).get();
+      if (existing) {
+        if (existing.parentId !== parentId || existing.senderId !== senderId || openChat(kind, parentId, existing.id, existing.body, existing.encrypted) !== body) return null;
+        const sender = tx.select({ role: users.role }).from(users).where(eq(users.id, senderId)).get();
+        return { id: existing.id, senderId, body, createdAt: existing.createdAt, senderRole: sender?.role };
+      }
+    }
     const last = tx.select({ createdAt: table.createdAt }).from(table).where(eq(parent, parentId)).orderBy(desc(table.createdAt)).limit(1).get();
     const createdAt = Math.max(Date.now(), (last?.createdAt ?? 0) + 1);
-    const message = { id: crypto.randomUUID(), senderId, body, createdAt };
+    const message = { id: clientId || crypto.randomUUID(), senderId, body, createdAt };
     const sealed = { ...message, body: sealChat(kind, parentId, message.id, body), encrypted: true };
     if (kind === "order") tx.insert(messages).values({ ...sealed, orderId: parentId }).run();
     else {

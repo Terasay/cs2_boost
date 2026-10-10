@@ -97,6 +97,7 @@ const errorMessages: Record<string, string> = {
   "Invalid price": "Укажите корректную положительную сумму.",
   "Invalid deadline": "Укажите существующую дату завершения.",
   "Message must be 1–2000 characters": "Сообщение должно содержать от 1 до 2000 символов.",
+  "Message reference already used": "Этот код сообщения уже использован. Обновите чат и проверьте историю перед новой отправкой.",
 };
 
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {

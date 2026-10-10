@@ -253,3 +253,5 @@
 @media (prefers-reduced-motion: reduce) {
   .faq-item, .workspace-nav a, .playing-art svg, .password-toggle { transition: none; }
 }
+
+.composer-failed{padding:10px 12px;margin-bottom:10px;border:1px solid #b77a554f;background:#a5501812;border-radius:7px;display:grid;gap:8px}.composer-failed>div{display:flex;align-items:center;justify-content:space-between;gap:8px}.composer-failed strong{font-size:12px;color:#f2b879}.composer-failed p{font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:76px;overflow:auto;margin:0}.composer-failed small{font-size:11px;color:#ba9a86}.composer-failed .secondary-action{justify-self:start;font-size:12px;padding:7px 10px}.composer-failed .icon-button{width:26px;height:26px}.history-button[aria-disabled=true]{opacity:.6;cursor:wait}.jump-latest{max-width:calc(100% - 24px);white-space:normal;text-align:center}@media(prefers-reduced-motion:no-preference){.conversation-heading button[aria-busy=true] svg{animation:chat-refresh 1s linear infinite}@keyframes chat-refresh{to{transform:rotate(360deg)}}}
