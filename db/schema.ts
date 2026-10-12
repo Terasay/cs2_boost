@@ -26,6 +26,56 @@ export const sessions = sqliteTable("sessions", {
   twoFactorVerified: integer("two_factor_verified", { mode: "boolean" }).notNull().default(false),
 }, table => [index("sessions_user_idx").on(table.userId), index("sessions_expiry_idx").on(table.expiresAt)]);
 
+export const passwordResets = sqliteTable("password_resets", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(),
+  createdAt: integer("created_at").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+}, table => [index("password_resets_user_idx").on(table.userId), index("password_resets_expiry_idx").on(table.expiresAt)]);
+
+export const notificationPreferences = sqliteTable("notification_preferences", {
+  userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  language: text("language", { enum: ["ru", "en"] }).notNull().default("ru"),
+  orderUpdates: integer("order_updates", { mode: "boolean" }).notNull().default(true),
+  chatReminders: integer("chat_reminders", { mode: "boolean" }).notNull().default(true),
+});
+
+export const chatReads = sqliteTable("chat_reads", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  parentId: text("parent_id").notNull(),
+  readAt: integer("read_at").notNull(),
+});
+
+export const mailOutbox = sqliteTable("mail_outbox", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  recipient: text("recipient").notNull(),
+  kind: text("kind").notNull(),
+  parentId: text("parent_id"),
+  payload: text("payload"),
+  status: text("status").notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  nextAttemptAt: integer("next_attempt_at").notNull(),
+  leaseUntil: integer("lease_until").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+  sentAt: integer("sent_at"),
+  lastError: text("last_error"),
+}, table => [index("mail_outbox_pending_idx").on(table.status, table.nextAttemptAt), index("mail_outbox_expiry_idx").on(table.expiresAt)]);
+
+export const mailUsage = sqliteTable("mail_usage", {
+  day: text("day").primaryKey(),
+  count: integer("count").notNull().default(0),
+});
+
+export const serviceState = sqliteTable("service_state", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+});
+
 export const twoFactors = sqliteTable("two_factors", {
   userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
   secret: text("secret").notNull(),

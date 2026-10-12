@@ -23,7 +23,7 @@ async function POSTHandler(request: Request) {
   if (input.clientId !== undefined && !validMessageId(input.clientId)) return fail("Invalid request");
   const retry = await chargeAttempt(await rateKey("support-message", null, user.id), 30, 5 * 60_000);
   if (retry) return privateJson({ error: "Too many messages. Try again later" }, 429, { "Retry-After": String(retry) });
-  const message = saveChatMessage("support", id, user.id, body, input.clientId as string | undefined);
+  const message = saveChatMessage("support", id, user.id, body, input.clientId as string | undefined, request);
   if (!message) return fail("Message reference already used", 409);
   return privateJson({ ok: true, message }, 201);
 }

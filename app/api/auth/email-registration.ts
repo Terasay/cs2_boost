@@ -1,7 +1,8 @@
 import { and, eq, gt, lt } from "drizzle-orm";
 import { createHash, randomBytes } from "node:crypto";
 import { getDb } from "@/db";
-import { emailVerifications, users } from "@/db/schema";
+import { emailVerifications, notificationPreferences, users } from "@/db/schema";
+import { reserveMailSlot } from "@/lib/notifications.mjs";
 import { cleanAttribution } from "@/lib/attribution.mjs";
 import { ratingValue } from "@/lib/order-validation";
 import { normalizePromo, validateRatings } from "@/lib/pricing.mjs";
@@ -46,12 +47,13 @@ export async function requestRegistration(request: Request) {
   if (existing) return accepted();
   const quota = await chargeAttempt(await rateKey("registration-mail-day", null, new Date().toISOString().slice(0, 10)), 90, 86400_000);
   if (quota) return fail("Registration email unavailable. Try again later", 503);
+  if (!reserveMailSlot(db.$client, true)) return fail("Registration email unavailable. Try again later", 503);
   const token = randomBytes(32).toString("hex");
   const id = digest(token);
   const now = Date.now();
   db.delete(emailVerifications).where(lt(emailVerifications.expiresAt, now)).run();
   const draft = registrationDraft(input.draft);
-  db.insert(emailVerifications).values({ id, email, createdAt: now, expiresAt: now + 30 * 60_000, draft: draft ? JSON.stringify({ draft, attribution: cleanAttribution(input.attribution) }) : null }).run();
+  db.insert(emailVerifications).values({ id, email, createdAt: now, expiresAt: now + 30 * 60_000, draft: JSON.stringify({ ...(draft ? { draft, attribution: cleanAttribution(input.attribution) } : {}), language: input.lang === "en" ? "en" : "ru" }) }).run();
   const lang = input.lang === "en" ? "en" : "ru";
   const url = `${publicOrigin(request)}/verify-email#token=${token}&lang=${lang}`;
   try {
@@ -81,8 +83,10 @@ export async function verifyRegistration(request: Request) {
   const registered = db.transaction(tx => {
     const [valid] = tx.select().from(emailVerifications).where(and(eq(emailVerifications.id, tokenId), gt(emailVerifications.expiresAt, Date.now()))).limit(1).all();
     if (!valid) return false;
+    const language = valid.draft ? JSON.parse(valid.draft).language : "ru";
     const [user] = tx.insert(users).values({ id, email: valid.email, passwordHash, role: "client", emailVerifiedAt: Date.now(), createdAt: Date.now() }).onConflictDoNothing().returning({ id: users.id }).all();
     tx.delete(emailVerifications).where(eq(emailVerifications.email, valid.email)).run();
+    if (user) tx.insert(notificationPreferences).values({ userId: id, language: language === "en" ? "en" : "ru" }).run();
     return Boolean(user);
   });
   if (!registered) return fail("Verification link is invalid or expired");

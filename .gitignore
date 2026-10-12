@@ -1,6 +1,5 @@
 
 /node_modules
-/pages-demo/node_modules/
 /.npm-cache/
 /.pnp
 .pnp.*
@@ -29,6 +28,7 @@ yarn-error.log*
 
 next-env.d.ts
 /dist/
+/build/
 *.tsbuildinfo
 /.wrangler/
 /.openai/

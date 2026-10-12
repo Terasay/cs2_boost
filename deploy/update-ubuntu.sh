@@ -42,6 +42,9 @@ else
     as_app env NODE_OPTIONS=--max-old-space-size=384 npm ci --dry-run --include=dev --ignore-scripts --prefer-offline --no-audit --no-fund
 fi
 as_app node scripts/backup.mjs
+if systemctl cat cs2-boost-mail.timer >/dev/null 2>&1; then
+    systemctl stop cs2-boost-mail.timer cs2-boost-mail.service
+fi
 systemctl stop cs2-boost
 trap 'echo "Update failed after the service was stopped. The database backup is available. Fix the reported error and rerun this script."' ERR
 if [[ "$install_dependencies" -eq 1 ]]; then
@@ -54,9 +57,10 @@ install -d -m 700 -o cs2boost -g cs2boost /opt/cs2-boost/.next/cache
 as_app env NODE_ENV=production node --env-file=/etc/cs2-boost.env scripts/migrate.mjs
 as_app env NODE_ENV=production node --env-file=/etc/cs2-boost.env scripts/check-config.mjs
 systemctl start cs2-boost
-install -m 644 deploy/cs2-boost-payments.service deploy/cs2-boost-payments.timer /etc/systemd/system/
+install -m 644 deploy/cs2-boost-payments.service deploy/cs2-boost-payments.timer deploy/cs2-boost-mail.service deploy/cs2-boost-mail.timer /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now cs2-boost-payments.timer
+systemctl enable --now cs2-boost-mail.timer
 curl --fail --retry 10 --retry-connrefused --retry-delay 2 http://127.0.0.1:3000/api/health
 if [[ "$clean_cache" -eq 1 ]]; then
     as_app npm cache clean --force

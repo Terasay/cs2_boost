@@ -3,6 +3,8 @@ import { getDb } from "@/db";
 import { orderAccess, orderEvents, orders, users } from "@/db/schema";
 import { openAccess, sealAccess } from "@/lib/order-access.mjs";
 import { dayMs } from "@/lib/pricing.mjs";
+import { enqueueOrderEvent } from "@/lib/notifications.mjs";
+import { publicOrigin } from "@/lib/server-config.mjs";
 import { getCurrentUser, verifyPassword } from "../../../auth/auth-lib";
 import { chargeAttempt, clearAttempts, rateKey } from "../../../auth/rate-limit";
 import { jsonInput, privateJson, safeApi, sameOriginMutation } from "../../../request-security";
@@ -52,7 +54,10 @@ async function POSTHandler(request: Request) {
         const dueAt = fresh.dueAt ?? startedAt + fresh.durationDays! * dayMs;
         tx.update(orderAccess).set({ receivedAt: now, receivedBy: user.id }).where(eq(orderAccess.orderId, id)).run();
         tx.update(orders).set({ status: "in_progress", startedAt, dueAt, updatedAt: Math.max(now, fresh.updatedAt + 1) }).where(eq(orders.id, id)).run();
-        tx.insert(orderEvents).values({ id: crypto.randomUUID(), orderId: id, actorId: user.id, type: fresh.startedAt ? "access_received" : "started", details: JSON.stringify({ startedAt, dueAt }), createdAt: now }).run();
+        const eventId = crypto.randomUUID();
+        const type = fresh.startedAt ? "access_received" : "started";
+        tx.insert(orderEvents).values({ id: eventId, orderId: id, actorId: user.id, type, details: JSON.stringify({ startedAt, dueAt }), createdAt: now }).run();
+        enqueueOrderEvent(db.$client, { orderId: id, actorId: user.id, type, eventId, origin: publicOrigin(request) });
         return privateJson({ ok: true, startedAt, dueAt });
       });
     }
@@ -78,7 +83,9 @@ async function POSTHandler(request: Request) {
     const values = { payload, createdAt: now, expiresAt, receivedAt: null, receivedBy: null };
     tx.insert(orderAccess).values({ orderId: id, ...values }).onConflictDoUpdate({ target: orderAccess.orderId, set: values }).run();
     tx.update(orders).set({ updatedAt: Math.max(now, fresh.updatedAt + 1) }).where(eq(orders.id, id)).run();
-    tx.insert(orderEvents).values({ id: crypto.randomUUID(), orderId: id, actorId: user.id, type: "access_submitted", details: "{}", createdAt: now }).run();
+    const eventId = crypto.randomUUID();
+    tx.insert(orderEvents).values({ id: eventId, orderId: id, actorId: user.id, type: "access_submitted", details: "{}", createdAt: now }).run();
+    enqueueOrderEvent(db.$client, { orderId: id, actorId: user.id, type: "access_submitted", eventId, origin: publicOrigin(request) });
     return privateJson({ ok: true });
   });
 }

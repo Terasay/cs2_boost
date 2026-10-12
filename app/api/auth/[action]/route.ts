@@ -1,10 +1,13 @@
 import { and, eq, lt, sql } from "drizzle-orm";
 import { getDb } from "@/db";
-import { authChallenges, sessions, twoFactors, users } from "@/db/schema";
+import { authChallenges, passwordResets, sessions, twoFactors, users } from "@/db/schema";
+import { enqueuePasswordChanged } from "@/lib/notifications.mjs";
+import { publicOrigin } from "@/lib/server-config.mjs";
 import { jsonInput, privateJson, safeApi, sameOriginMutation } from "../../request-security";
 import { clearSessionCookie, createSession, deleteAllSessions, deleteSession, getCurrentUser, hashPassword, needsPasswordUpgrade, verifyPassword } from "../auth-lib";
 import { chargeAttempt, clearAttempts, rateKey } from "../rate-limit";
 import { requestRegistration, verifyRegistration } from "../email-registration";
+import { requestPasswordReset, resetPassword } from "../password-recovery";
 import { beginSecondFactor, clearChallenge, consumeFactor, factorLimit, manageSecondFactor, twoFactorStatus, verifySecondFactor } from "../two-factor";
 
 const DUMMY_HASH = `600000:${"0".repeat(32)}:${"0".repeat(64)}`;
@@ -21,6 +24,8 @@ async function POSTHandler(request: Request) {
   const action = new URL(request.url).pathname.split("/").pop();
   if (action === "register" || action === "resend-verification") return requestRegistration(request);
   if (action === "verify-email") return verifyRegistration(request);
+  if (action === "forgot-password") return requestPasswordReset(request);
+  if (action === "reset-password" || action === "reset-password-check") return resetPassword(request, action === "reset-password-check");
   if (action === "two-factor-login") return verifySecondFactor(request);
   if (["two-factor-setup", "two-factor-enable", "two-factor-disable", "two-factor-recovery"].includes(action ?? "")) return manageSecondFactor(request, action!);
   if (action === "logout") {
@@ -64,6 +69,9 @@ async function POSTHandler(request: Request) {
       const changed = tx.update(users).set({ passwordHash, sessionVersion: sql`${users.sessionVersion} + 1` }).where(eq(users.id, user.id)).returning({ version: users.sessionVersion }).get()!;
       tx.delete(sessions).where(and(eq(sessions.userId, user.id), lt(sessions.version, changed.version))).run();
       tx.delete(authChallenges).where(eq(authChallenges.userId, user.id)).run();
+      tx.delete(passwordResets).where(eq(passwordResets.userId, user.id)).run();
+      db.$client.prepare("UPDATE mail_outbox SET status = 'skipped', payload = NULL WHERE user_id = ? AND kind = 'password-reset' AND status = 'pending'").run(user.id);
+      enqueuePasswordChanged(db.$client, { userId: user.id, eventId: `${user.id}:${changed.version}`, origin: publicOrigin(request) });
       return changed;
     });
     if ("error" in updated) return fail(updated.error!, updated.status);

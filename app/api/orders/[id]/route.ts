@@ -6,6 +6,8 @@ import { jsonInput, privateJson, safeApi, sameOriginMutation } from "../../reque
 import { readChatPage } from "../../chat-history";
 import { dayMs, discountedAmount } from "@/lib/pricing.mjs";
 import { orderPaymentStatus } from "../../payments/donationalerts/service";
+import { enqueueOrderEvent } from "@/lib/notifications.mjs";
+import { publicOrigin } from "@/lib/server-config.mjs";
 
 const fail = (error: string, status = 400) => privateJson({ error }, status);
 const orderId = (request: Request) => new URL(request.url).pathname.split("/").pop()!;
@@ -18,7 +20,7 @@ async function GETHandler(request: Request) {
   const order = db.select().from(orders).where(eq(orders.id, id)).get();
   if (!order || (user.role !== "admin" && order.userId !== user.id)) return fail("Order not found", 404);
   const client = db.select({ email: users.email }).from(users).where(eq(users.id, order.userId)).get();
-  const chat = await readChatPage("order", id, request);
+  const chat = await readChatPage("order", id, request, user.id);
   if (!chat) return fail("Invalid cursor");
   const access = db.select({ submittedAt: orderAccess.createdAt, expiresAt: orderAccess.expiresAt, receivedAt: orderAccess.receivedAt }).from(orderAccess).where(and(eq(orderAccess.orderId, id), gt(orderAccess.expiresAt, Date.now()))).get();
   const events = db.select().from(orderEvents).where(eq(orderEvents.orderId, id)).orderBy(desc(orderEvents.createdAt), desc(orderEvents.id)).limit(50).all().map(event => ({ id: event.id, type: event.type, details: JSON.parse(event.details), createdAt: event.createdAt }));
@@ -106,7 +108,9 @@ async function PATCHHandler(request: Request) {
     } else return fail("Invalid order action");
     if (["propose", "cancel"].includes(String(action))) tx.update(paymentIntents).set({ status: "void" }).where(and(eq(paymentIntents.orderId, id), inArray(paymentIntents.status, ["pending", "review"]))).run();
     tx.update(orders).set(changes).where(eq(orders.id, id)).run();
-    tx.insert(orderEvents).values({ id: crypto.randomUUID(), orderId: id, actorId: user.id, type: String(action), details: JSON.stringify(details), createdAt: now }).run();
+    const eventId = crypto.randomUUID();
+    tx.insert(orderEvents).values({ id: eventId, orderId: id, actorId: user.id, type: String(action), details: JSON.stringify(details), createdAt: now }).run();
+    enqueueOrderEvent(db.$client, { orderId: id, actorId: user.id, type: String(action), eventId, origin: publicOrigin(request) });
     return privateJson({ ok: true });
   });
 }

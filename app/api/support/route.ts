@@ -15,7 +15,7 @@ async function GETHandler(request: Request) {
   if (user.role !== "client") return fail("Client account required", 403);
   const db = getDb();
   const [thread] = await db.select().from(supportThreads).where(eq(supportThreads.userId, user.id)).limit(1);
-  const chat = thread ? await readChatPage("support", thread.id, request) : { messages: [], nextCursor: null };
+  const chat = thread ? await readChatPage("support", thread.id, request, user.id) : { messages: [], nextCursor: null };
   if (!chat) return fail("Invalid cursor");
   return privateJson({ thread: thread ?? null, ...chat, currentUserId: user.id, role: user.role });
 }
@@ -37,7 +37,7 @@ async function POSTHandler(request: Request) {
   await db.insert(supportThreads).values({ id: crypto.randomUUID(), userId: user.id, status: "open", createdAt: now, updatedAt: now }).onConflictDoNothing();
   const [thread] = await db.select({ id: supportThreads.id }).from(supportThreads).where(eq(supportThreads.userId, user.id)).limit(1);
   if (!thread) return fail("Support unavailable", 503);
-  const message = saveChatMessage("support", thread.id, user.id, body, input.clientId as string | undefined);
+  const message = saveChatMessage("support", thread.id, user.id, body, input.clientId as string | undefined, request);
   if (!message) return fail("Message reference already used", 409);
   return privateJson({ id: thread.id, message }, 201);
 }

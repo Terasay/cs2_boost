@@ -1,0 +1,12 @@
+import type Database from "better-sqlite3";
+export type NotificationPreferences = { language: "ru" | "en"; orderUpdates: boolean; chatReminders: boolean };
+export function emailConfigured(): boolean;
+export function notificationsEnabled(): boolean;
+export function preferences(database: Database.Database, userId: string): NotificationPreferences;
+export function reserveMailSlot(database: Database.Database, essential?: boolean, now?: number): boolean;
+export function enqueueEmail(database: Database.Database, options: {key: string; userId: string; kind: string; parentId?: string | null; letter: { subject: string; text: string; tokenId?: string }; availableAt?: number; expiresAt?: number; now?: number}): boolean;
+export function enqueuePasswordChanged(database: Database.Database, options: {userId: string; eventId: string; origin: string}): void;
+export function enqueueOrderEvent(database: Database.Database, options: { orderId: string; actorId: string; type: string; eventId: string; origin: string }): void;
+export function markChatRead(database: Database.Database, kind: "order" | "support", parentId: string, userId: string, readAt: number): void;
+export function enqueueChatReminder(database: Database.Database, options: {kind: "order" | "support"; parentId: string; senderId: string; origin: string; now?: number}): void;
+export function processMailQueue(database: Database.Database, options?: {now?: number; limit?: number; send?: (letter: {to: string; subject: string; text: string; idempotencyKey: string}) => Promise<string>}): Promise<{configured: boolean; sent: number; retried: number; skipped: number}>;

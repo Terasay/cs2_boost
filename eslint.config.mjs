@@ -10,7 +10,6 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "dist/**",
-    "docs/**",
     ".npm-cache/**",
     ".wrangler/**",
     "outputs/**",
@@ -22,14 +21,6 @@ const eslintConfig = defineConfig([
     rules: {
       "@next/next/no-html-link-for-pages": "off",
       "@next/next/no-location-assign-relative-destination": "off",
-    },
-  },
-  {
-    files: ["components/ui/**/*.{ts,tsx}", "hooks/use-mobile.ts"],
-    rules: {
-      "@typescript-eslint/no-unused-vars": "off",
-      "react-hooks/purity": "off",
-      "react-hooks/set-state-in-effect": "off",
     },
   },
 ]);

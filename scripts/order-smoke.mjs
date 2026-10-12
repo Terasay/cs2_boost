@@ -32,7 +32,7 @@ async function fixture(name,role="client") {
 try {
   for(let attempt=0;attempt<100;attempt++){if(server.exitCode !== null)throw new Error(logs);try{const response=await fetch(base+"/api/health");if(response.ok)break;}catch{}await delay(100);if(attempt===99)throw new Error(logs);}
   const client=await fixture("client"),admin=await fixture("admin","admin"),other=await fixture("other");
-  const create=async(extra={})=>(await call("/api/orders",client.cookie,{platform:"premier",service:"rating",method:"piloted",current:4000,target:6000,riskAccepted:true,redTrust:true,promoCode:"cherep",totalAmount:1,commissionAmount:999999,status:"completed",...extra},201)).data.id;
+  const create=async(extra={},cookie=client.cookie)=>(await call("/api/orders",cookie,{platform:"premier",service:"rating",method:"piloted",current:4000,target:6000,riskAccepted:true,redTrust:true,promoCode:"cherep",totalAmount:1,commissionAmount:999999,status:"completed",...extra},201)).data.id;
   const get=async(id,cookie=admin.cookie)=>(await call(`/api/orders/${id}`,cookie)).data;
   const patch=async(id,action,extra={},expected=200,cookie=admin.cookie)=>call(`/api/orders/${id}`,cookie,{action,updatedAt:(await get(id,cookie)).order.updatedAt,...extra},expected,"PATCH");
   await call("/api/promos","",undefined,401);await call("/api/promos",client.cookie,undefined,403);
@@ -91,6 +91,7 @@ try {
   await patch(id,"delay",{days:1,reason:"Additional scheduling time",bonus:"One extra duo session"});
   detail=await get(id);assert.equal(detail.order.dueAt,dueAt+dayMs);assert.equal(detail.order.startedAt,startedAt);assert(detail.events.some(event=>event.type === "delay" && event.details.bonus));
   await patch(id,"cancel",{reason:"Trying to cancel paid order"},409);
+  await patch(id,"cancel",{reason:"Client trying to cancel paid order"},409,client.cookie);
   await patch(id,"complete",{confirmed:true});assert.equal(db.prepare("SELECT count(*) AS n FROM order_access WHERE order_id=?").get(id).n,0);
   await call(`/api/orders/${id}/access`,admin.cookie,{action:"reveal",adminPassword:password},409);
   let report=(await call("/api/promos",admin.cookie)).data;let cherep=report.codes.find(code=>code.code === "Cherep");assert.equal(cherep.earned,17600);assert.equal(cherep.paidOrders,1);
@@ -110,9 +111,25 @@ try {
   await call(`/api/orders/${proposedId}/access`,admin.cookie,{action:"reveal",adminPassword:password},404);assert.equal(db.prepare("SELECT count(*) AS n FROM order_access WHERE order_id=?").get(proposedId).n,0);
   const calibrationId=await create({service:"calibration",current:null,target:null,redTrust:false});await patch(calibrationId,"accept",{},409);await patch(calibrationId,"propose",{amount:200000,days:3,reason:"Calibration scope agreed"});await patch(calibrationId,"accept",{},200,client.cookie);assert.equal((await get(calibrationId)).order.totalAmount,160000);
   const pendingId=await create({promoCode:null,redTrust:false});await patch(pendingId,"cancel",{reason:"No capacity available"});assert.equal((await get(pendingId)).order.status,"cancelled");assert.equal(db.prepare("SELECT count(*) AS n FROM promo_earnings WHERE order_id=?").get(pendingId).n,0);
+  for (const state of ["new", "quoted", "awaiting_payment"]) {
+    const cancelledId = await create({promoCode:null, redTrust:false}, other.cookie);
+    if (state === "quoted") await patch(cancelledId, "propose", {amount:120000, days:3, reason:"Different schedule"});
+    if (state === "awaiting_payment") await patch(cancelledId, "accept");
+    await patch(cancelledId, "cancel", {reason:" "}, 400, other.cookie);
+    assert.equal((await get(cancelledId, other.cookie)).order.status, state);
+    await patch(cancelledId, "cancel", {reason:"Client changed their plans"}, 200, other.cookie);
+    const cancelled = await get(cancelledId, other.cookie);
+    assert.equal(cancelled.order.status, "cancelled");
+    assert.equal(cancelled.order.proposalAmount, null);
+    assert.equal(cancelled.order.paidAt, null);
+    assert.equal(cancelled.order.startedAt, null);
+    assert.equal(cancelled.events.filter(event => event.type === "cancel").length, 1);
+    assert(cancelled.events.some(event => event.details.reason === "Client changed their plans"));
+    await patch(cancelledId, "cancel", {reason:"Repeated cancellation"}, 409, other.cookie);
+  }
   report=(await call("/api/promos",admin.cookie)).data;assert.equal(report.codes.find(code=>code.code === "Terasay").earned,24000);
   const full=spawnSync(process.execPath,["scripts/smoke.mjs"],{env:{...env,SITE_TEST_URL:base,SITE_TEST_ORIGIN:base},encoding:"utf8"});assert.equal(full.status,0,full.stderr || full.stdout);
-  console.log(JSON.stringify({ok:true,frozenPricing:true,manualPayment:true,adminAccessReceipt:true,concurrentPayment:true,singleEarning:true,encryptedAccess:true,roleIsolation:true,stableTimer:true,transparentOffers:true,refundReversal:true,calibration:true,existingSmoke:true}));
+  console.log(JSON.stringify({ok:true,frozenPricing:true,manualPayment:true,adminAccessReceipt:true,concurrentPayment:true,singleEarning:true,encryptedAccess:true,roleIsolation:true,stableTimer:true,transparentOffers:true,refundReversal:true,calibration:true,clientCancellation:true,existingSmoke:true}));
   if(process.env.SITE_KEEP_FIXTURES === "1"){
     writeFileSync("work/order-ui-fixture.json",JSON.stringify({base,dbPath,clientEmail:client.email,adminEmail:admin.email,password,orderId:proposedId,encryptionKey:env.ORDER_ACCESS_KEY}));
     keepServer = true;

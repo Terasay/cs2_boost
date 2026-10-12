@@ -5,6 +5,8 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { orders, users } from "@/db/schema";
 import { getCurrentUser } from "../auth/auth-lib";
+import { enqueueOrderEvent } from "@/lib/notifications.mjs";
+import { publicOrigin } from "@/lib/server-config.mjs";
 import { chargeAttempt, rateKey } from "../auth/rate-limit";
 import { jsonInput, privateJson, safeApi, sameOriginMutation } from "../request-security";
 import { listQuery, orderReply, searchCondition } from "../list-query";
@@ -61,7 +63,11 @@ async function POSTHandler(request: Request) {
   const now = Date.now();
   const id = crypto.randomUUID();
   const attribution = cleanAttribution(input.attribution);
-  await getDb().insert(orders).values({ id, userId: user.id, platform, service, method, currentRating, targetRating, status: "new", pricingVersion: price.pricingVersion, redTrust: price.redTrust, promoCode: price.promoCode, baseAmount: price.baseAmount, surchargeAmount: price.surchargeAmount, discountAmount: price.discountAmount, totalAmount: price.totalAmount, initialTotalAmount: price.totalAmount, commissionAmount: price.commissionAmount, durationDays: price.durationDays, standardDays: price.durationDays, quotedCurrency: "RUB", source: attribution?.source ?? null, medium: attribution?.medium ?? null, campaign: attribution?.campaign ?? null, campaignContent: attribution?.content ?? null, riskAcceptedAt: now, createdAt: now, updatedAt: now });
+  const db = getDb();
+  db.transaction(tx => {
+    tx.insert(orders).values({ id, userId: user.id, platform, service, method, currentRating, targetRating, status: "new", pricingVersion: price.pricingVersion, redTrust: price.redTrust, promoCode: price.promoCode, baseAmount: price.baseAmount, surchargeAmount: price.surchargeAmount, discountAmount: price.discountAmount, totalAmount: price.totalAmount, initialTotalAmount: price.totalAmount, commissionAmount: price.commissionAmount, durationDays: price.durationDays, standardDays: price.durationDays, quotedCurrency: "RUB", source: attribution?.source ?? null, medium: attribution?.medium ?? null, campaign: attribution?.campaign ?? null, campaignContent: attribution?.content ?? null, riskAcceptedAt: now, createdAt: now, updatedAt: now }).run();
+    enqueueOrderEvent(db.$client, { orderId: id, actorId: user.id, type: "new", eventId: id, origin: publicOrigin(request) });
+  });
   return privateJson({ id }, 201);
 }
 

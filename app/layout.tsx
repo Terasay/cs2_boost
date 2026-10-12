@@ -8,6 +8,8 @@ import "./interface.css";
 import "./tactical.css";
 import "./legal.css";
 import "./payments.css";
+import "./order-actions.css";
+import "./recovery.css";
 
 export const metadata: Metadata = {
   title: "CS2 Boost — Premier & FACEIT",

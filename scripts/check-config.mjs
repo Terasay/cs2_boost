@@ -13,6 +13,11 @@ const database = openDatabase();
 try {
   database.prepare("SELECT session_version FROM users LIMIT 1").get();
   database.prepare("SELECT id FROM email_verifications LIMIT 1").get();
+  database.prepare("SELECT id FROM password_resets LIMIT 1").get();
+  database.prepare("SELECT id FROM mail_outbox LIMIT 1").get();
+  const mailLimit = Number(process.env.MAIL_DAILY_LIMIT || 90);
+  if (!Number.isInteger(mailLimit) || mailLimit < 10 || mailLimit > 10000) throw new Error("Invalid daily email limit");
+  if (["EMAIL_NOTIFICATIONS", "EMAIL_MONITOR"].some(key => process.env[key] && !["0", "1"].includes(process.env[key]))) throw new Error("Email switches must be 0 or 1");
   database.prepare("SELECT total_amount FROM orders LIMIT 1").get();
   accessKey();
   twoFactorKey();
@@ -20,7 +25,7 @@ try {
   for (const factor of database.prepare("SELECT user_id, secret FROM two_factors WHERE enabled_at IS NOT NULL").all()) openSecret(factor.user_id, factor.secret);
   if (process.env.RESEND_API_KEY || process.env.MAIL_FROM) {
     mailConfig();
-    console.log("Registration email configuration is present (delivery not tested)");
+    console.log("Registration, recovery and notification email configuration is present (delivery not tested)");
   } else console.log("Registration email is not configured; new registrations are unavailable");
   console.log("Server configuration is valid");
 } finally {

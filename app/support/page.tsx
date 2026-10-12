@@ -1,5 +1,5 @@
-import SupportChat from "./support-chat";
+import SupportWorkspace from "../support-workspace";
 
 export default function SupportPage() {
-  return <SupportChat/>;
+  return <SupportWorkspace/>;
 }

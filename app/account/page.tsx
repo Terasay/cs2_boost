@@ -8,6 +8,7 @@ import { AccountShell, api, type User, useLanguage } from "../account-ui";
 import { TwoFactorSettings } from "../two-factor-settings";
 import { WorkspaceNav } from "../workspace-ui";
 import { PasswordInput } from "../password-input";
+import { NotificationSettings } from "../notification-settings";
 
 export default function Account() {
   const lang = useLanguage();
@@ -86,5 +87,6 @@ export default function Account() {
         <section className="account-panel security-panel"><div className="panel-heading"><span className="panel-icon"><Monitor size={21}/></span><div><h2>{t("Входы на устройствах", "Device sign-ins")}</h2><p>{t("Завершите все сессии, если входили с чужого устройства. Текущая сессия тоже закроется.", "End all sessions if you used another person's device. This session will close too.")}</p></div></div><Button type="button" variant="secondary" className="account-cta" disabled={busy || !user} onClick={signOutEverywhere}><LogOut size={17}/>{t("Выйти на всех устройствах", "Sign out on every device")}</Button></section>
       </div>
     </div>
+    <div className="account-notifications">{user && <NotificationSettings ru={lang === "ru"}/>}</div>
   </AccountShell>;
 }

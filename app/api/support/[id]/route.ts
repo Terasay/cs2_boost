@@ -16,7 +16,7 @@ async function GETHandler(request: Request) {
   const [thread] = await db.select().from(supportThreads).where(eq(supportThreads.id, id)).limit(1);
   if (!thread || (user.role !== "admin" && thread.userId !== user.id)) return fail("Conversation not found", 404);
   const [client] = await db.select({ email: users.email }).from(users).where(eq(users.id, thread.userId)).limit(1);
-  const chat = await readChatPage("support", id, request);
+  const chat = await readChatPage("support", id, request, user.id);
   if (!chat) return fail("Invalid cursor");
   return privateJson({ thread: { ...thread, clientEmail: client?.email }, ...chat, currentUserId: user.id, role: user.role });
 }

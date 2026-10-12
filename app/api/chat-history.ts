@@ -2,8 +2,10 @@ import { and, asc, desc, eq, gt, lt, or } from "drizzle-orm";
 import { getDb } from "@/db";
 import { messages, supportMessages, supportThreads, users } from "@/db/schema";
 import { openChat, sealChat } from "@/lib/chat-vault.mjs";
+import { enqueueChatReminder, markChatRead } from "@/lib/notifications.mjs";
+import { publicOrigin } from "@/lib/server-config.mjs";
 
-export async function readChatPage(kind: "order" | "support", parentId: string, request: Request) {
+export async function readChatPage(kind: "order" | "support", parentId: string, request: Request, userId: string) {
   const table = kind === "order" ? messages : supportMessages;
   const parent = kind === "order" ? messages.orderId : supportMessages.threadId;
   const query = new URL(request.url).searchParams;
@@ -21,12 +23,13 @@ export async function readChatPage(kind: "order" | "support", parentId: string, 
   const visible = after !== null ? rows.slice(0, 50) : rows.slice(0, 50).reverse();
   const page = visible.map(({ encrypted, ...row }) => ({ ...row, body: openChat(kind, parentId, row.id, row.body, encrypted) }));
   const latest = page.at(-1);
+  if (latest) markChatRead(getDb().$client, kind, parentId, userId, latest.createdAt);
   return { messages: page, nextCursor: after === null && rows.length > 50 ? `${page[0].createdAt}:${page[0].id}` : null, latestCursor: latest ? `${latest.createdAt}:${latest.id}` : null, hasMore: after !== null && rows.length > 50 };
 }
 
 export const validMessageId = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value);
 
-export function saveChatMessage(kind: "order" | "support", parentId: string, senderId: string, body: string, clientId?: string) {
+export function saveChatMessage(kind: "order" | "support", parentId: string, senderId: string, body: string, clientId?: string, request?: Request) {
   const table = kind === "order" ? messages : supportMessages;
   const parent = kind === "order" ? messages.orderId : supportMessages.threadId;
   return getDb().transaction(tx => {
@@ -48,6 +51,7 @@ export function saveChatMessage(kind: "order" | "support", parentId: string, sen
       tx.update(supportThreads).set({ status: "open", updatedAt: createdAt }).where(eq(supportThreads.id, parentId)).run();
     }
     const sender = tx.select({ role: users.role }).from(users).where(eq(users.id, senderId)).get();
+    if (request) enqueueChatReminder(getDb().$client, { kind, parentId, senderId, origin: publicOrigin(request), now: createdAt });
     return { ...message, senderRole: sender?.role };
   });
 }

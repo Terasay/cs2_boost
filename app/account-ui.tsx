@@ -25,8 +25,9 @@ export function useLanguage() {
   return lang;
 }
 
-export function AccountShell({ children, back, backLabel, workspace = false }: { children: React.ReactNode; back?: string; backLabel?: string; workspace?: boolean }) {
-  const lang = useLanguage();
+export function AccountShell({ children, back, backLabel, workspace = false, language }: { children: React.ReactNode; back?: string; backLabel?: string; workspace?: boolean; language?: "ru" | "en" }) {
+  const savedLanguage = useLanguage();
+  const lang = language ?? savedLanguage;
   return <div className={workspace ? "account-page workspace-shell" : "account-page"}><header className="account-header wrap"><Brand href={`/${lang}`}/><span className="workspace-context">{workspace ? (lang === "ru" ? "ЛИЧНЫЙ КАБИНЕТ" : "ACCOUNT WORKSPACE") : "SECURE ACCESS"}</span><a href={back ?? `/${lang}`} className="account-back"><ArrowLeft size={17}/>{backLabel ?? (lang === "ru" ? "На главную" : "Home")}</a></header><main className="account-main wrap">{children}</main><footer className="wrap account-legal" aria-label={lang === "ru" ? "Документы сервиса" : "Service documents"}><a href={`/${lang}/legal`}>{lang === "ru" ? "Документы сервиса" : "Service documents"}</a><a href={`/${lang}/legal/terms`}>{lang === "ru" ? "Соглашение" : "Terms"}</a><a href={`/${lang}/legal/privacy`}>{lang === "ru" ? "Конфиденциальность" : "Privacy"}</a><a href={`/${lang}/legal/payments`}>{lang === "ru" ? "Оплата и возвраты" : "Payments & refunds"}</a></footer></div>;
 }
 
@@ -36,6 +37,9 @@ export class ApiError extends Error {
 }
 
 const errorMessages: Record<string, string> = {
+  "Recovery email unavailable. Try again later": "Не удалось подготовить письмо для восстановления. Попробуйте позже.",
+  "Reset link is invalid or expired": "Ссылка недействительна, уже использована или истекла. Запросите новую.",
+  "Invalid notification settings": "Проверьте настройки уведомлений.",
   "DonationAlerts test mode is disabled": "Включите DONATIONALERTS_MODE=test на сервере и перезапустите сайт.",
   "DonationAlerts OAuth is not configured": "Заполните Client ID и Client Secret DonationAlerts в настройках сервера.",
   "Connect DonationAlerts first": "Сначала подключите аккаунт DonationAlerts.",

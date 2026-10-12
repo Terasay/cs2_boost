@@ -8,6 +8,7 @@ if (!outbox.startsWith(work) || !database.startsWith(work) || process.env.RESEND
 mkdirSync(outbox, { recursive: true });
 const original = globalThis.fetch;
 globalThis.fetch = async (input, options) => {
+  if (process.env.SITE_HEALTH_RESULT && /^http:\/\/127\.0\.0\.1:\d+\/api\/health$/.test(String(input))) return Response.json({ ok: process.env.SITE_HEALTH_RESULT === "up" }, { status: process.env.SITE_HEALTH_RESULT === "up" ? 200 : 503 });
   if (String(input) !== "https://api.resend.com/emails") return original(input, options);
   const payload = JSON.parse(options.body);
   if (payload.to.some(email => !email.endsWith("@example.test"))) throw new Error("Only synthetic recipients are allowed");

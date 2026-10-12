@@ -18,7 +18,7 @@ function fixture({ installed = false, badLock = false, lowDisk = false, brokenMo
   const source=readFileSync("deploy/update-ubuntu.sh","utf8").replaceAll("\r\n","\n").replace("if [[ $EUID -ne 0 ]]; then","if false; then").replaceAll("/opt/cs2-boost",posix(root)).replaceAll("/etc/cs2-boost.env",posix(environment)).replaceAll("/opt/node24/bin",posix(bin)).replace("export PATH=",`export PATH=${posix(bin)}:`);
   const script=join(root,"deploy/update-ubuntu.sh");writeFileSync(script,source);
   const mocks={
-    node:`case "$1" in *dependency-fingerprint.mjs) echo known;; *dependencies-ready.mjs) exit "$BROKEN_MODULES";; *) echo "node:$1" >> "$TRACE";; esac`,
+    node:`case "$1" in *dependency-fingerprint.mjs) echo known;; *dependencies-ready.mjs) exit "$BROKEN_MODULES";; *) echo "node:$*" >> "$TRACE";; esac`,
     runuser:'shift 3\nexec "$@"',
     df:'echo "Filesystem Blocks Used Available Use% Mounted"\necho "disk 9999999 1000 $FREE_BLOCKS 1% /"',
     systemctl:'echo "systemctl:$*" >> "$TRACE"',
@@ -36,6 +36,10 @@ function fixture({ installed = false, badLock = false, lowDisk = false, brokenMo
 
 test("ordinary update reuses working dependencies; forced reinstall runs a preflight",{skip:!available},()=>{
   const ready=fixture({installed:true}).run();assert.equal(ready.status,0,ready.stderr);assert(!ready.trace.includes("preflight"));assert(!ready.trace.includes("dependencies"));assert(ready.trace.includes("build"));assert(ready.trace.includes("systemctl:start cs2-boost"));
+  assert(ready.trace.includes("systemctl:enable --now cs2-boost-mail.timer"));
+  assert(ready.trace.indexOf("systemctl:stop cs2-boost-mail.timer cs2-boost-mail.service") < ready.trace.indexOf("build"));
+  assert(ready.trace.includes("scripts/migrate.mjs"));
+  assert(ready.trace.indexOf("scripts/migrate.mjs") < ready.trace.indexOf("systemctl:enable --now cs2-boost-mail.timer"));
   const forced=fixture({installed:true}).run(["--reinstall"]);assert.equal(forced.status,0,forced.stderr);assert(forced.trace.includes("preflight"));assert(forced.trace.includes("dependencies"));
   const broken=fixture({installed:true,brokenModules:true}).run();assert.notEqual(broken.status,0);assert(broken.trace.includes("preflight"));assert(broken.trace.includes("dependencies"));
 });
