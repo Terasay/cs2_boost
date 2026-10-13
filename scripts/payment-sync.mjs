@@ -5,4 +5,6 @@ if (process.env.DONATIONALERTS_MODE === "orders") {
     headers: { Authorization: `Bearer ${process.env.PAYMENTS_SYNC_KEY}` },
   });
   if (!response.ok) throw new Error(`Payment sync failed (${response.status})`);
+  const result = await response.json();
+  console.log(JSON.stringify({ ok: true, checked: !result.skipped, results: result.results || {} }));
 }

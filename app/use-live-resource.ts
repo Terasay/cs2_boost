@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, api } from "./account-ui";
 import { mergeChatPages, refreshChat, type ChatPage } from "@/lib/chat-sync";
 
-export function useLiveResource<T>(endpoint: string, interval = 5000, chat = false, forbiddenRedirect?: string) {
+export function useLiveResource<T>(endpoint: string, interval = 5000, chat = false, forbiddenRedirect?: string, options?: { markRead: boolean }) {
+  const markRead = options?.markRead !== false;
   const [stored, setStored] = useState<{ key: string; value: T } | null>(null);
   const [failure, setFailure] = useState<{ key: string; message: string } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -19,7 +20,7 @@ export function useLiveResource<T>(endpoint: string, interval = 5000, chat = fal
     setLoading(true);
     try {
       const signal = AbortSignal.any([abort.signal, AbortSignal.timeout(15000)]);
-      const sync = chat ? await refreshChat(endpoint, latest.current?.key === endpoint ? latest.current.cursor : null, url => api<T & ChatPage>(url, { signal })) : null;
+      const sync = chat ? await refreshChat(endpoint, latest.current?.key === endpoint ? latest.current.cursor : null, url => api<T & ChatPage>(markRead ? url : `${url}${url.includes("?") ? "&" : "?"}read=0`, { signal })) : null;
       const result = sync ? sync.page : await api<T>(endpoint, { signal });
       if (request !== sequence.current || abort.signal.aborted) return;
       if (sync) latest.current = { key: endpoint, cursor: sync.cursor };
@@ -37,7 +38,7 @@ export function useLiveResource<T>(endpoint: string, interval = 5000, chat = fal
       if (reason instanceof ApiError && reason.status === 403 && forbiddenRedirect) { window.location.assign(forbiddenRedirect); return; }
       setFailure({ key: endpoint, message: reason instanceof Error ? reason.message : "Error" });
     } finally { if (request === sequence.current) { setLoading(false); controller.current = null; } }
-  }, [endpoint, chat, forbiddenRedirect]);
+  }, [endpoint, chat, forbiddenRedirect, markRead]);
   useEffect(() => {
     const requests = sequence;
     const initial = setTimeout(reload, 0);

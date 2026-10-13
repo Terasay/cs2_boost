@@ -23,7 +23,7 @@ export async function readChatPage(kind: "order" | "support", parentId: string, 
   const visible = after !== null ? rows.slice(0, 50) : rows.slice(0, 50).reverse();
   const page = visible.map(({ encrypted, ...row }) => ({ ...row, body: openChat(kind, parentId, row.id, row.body, encrypted) }));
   const latest = page.at(-1);
-  if (latest) markChatRead(getDb().$client, kind, parentId, userId, latest.createdAt);
+  if (latest && new URL(request.url).searchParams.get("read") !== "0") markChatRead(getDb().$client, kind, parentId, userId, latest.createdAt);
   return { messages: page, nextCursor: after === null && rows.length > 50 ? `${page[0].createdAt}:${page[0].id}` : null, latestCursor: latest ? `${latest.createdAt}:${latest.id}` : null, hasMore: after !== null && rows.length > 50 };
 }
 

@@ -24,9 +24,10 @@ test("money is represented exactly, and non-money values never round into a vali
   for (const value of ["500", true, null, 0, -1, Infinity, NaN, 1.005, 0.0001, 100000001]) assert.equal(donationMinorAmount(value), null);
 });
 
-test("only typed donation alerts with exact unpredictable references are considered", () => {
+test("only typed donation alerts with one complete unpredictable reference are considered", () => {
   assert.deepEqual(normalizeDonation(fixture), { id: "123", reference, amount: 50001, currency: "RUB" });
-  for (const extra of [{ name: "custom" }, { message_type: "audio" }, { id: "123" }, { id: 0 }, { id: 1.5 }, { message: `${reference} other` }, { message: "CS2TEST-ab" }, { currency: "rub" }, { amount: "500.01" }, { amount: 500.001 }]) assert.equal(normalizeDonation({ ...fixture, ...extra }), null);
+  assert.deepEqual(normalizeDonation({ ...fixture, message: `Оплата заказа (${reference.toUpperCase()}). Спасибо!` }), normalizeDonation(fixture));
+  for (const extra of [{ name: "custom" }, { message_type: "audio" }, { id: "123" }, { id: 0 }, { id: 1.5 }, { message: `${reference} ${reference}` }, { message: `x${reference}` }, { message: `${reference}0` }, { message: "CS2TEST-ab" }, { message: "x".repeat(2001) }, { currency: "rub" }, { amount: "500.01" }, { amount: 500.001 }]) assert.equal(normalizeDonation({ ...fixture, ...extra }), null);
 });
 
 test("exact amounts, currencies, deadlines and already matched tests are checked", () => {
