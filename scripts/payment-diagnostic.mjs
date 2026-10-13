@@ -3,14 +3,17 @@ import { databasePath } from "../db/connection.mjs";
 import { openAccess } from "../lib/order-access.mjs";
 import { donationConfig, donationMinorAmount, donationPage, normalizeDonation } from "../lib/donationalerts.mjs";
 
-const [orderId, alertId] = process.argv.slice(2);
-const expectedErrors = new Set(["Use: node scripts/payment-diagnostic.mjs <order-id> [donation-id]", "Order not found", "DonationAlerts is not connected to the configured account", "DonationAlerts token expired. Run a payment check on the website first", "DonationAlerts authorization expired. Reconnect the account", "DonationAlerts API is unavailable"]);
+const [orderIdentifier, alertId] = process.argv.slice(2);
+const usage = "Use: node scripts/payment-diagnostic.mjs <order-id|payment-reference> [donation-id]";
+const expectedErrors = new Set([usage, "Order not found", "DonationAlerts is not connected to the configured account", "DonationAlerts token expired. Run a payment check on the website first", "DonationAlerts authorization expired. Reconnect the account", "DonationAlerts API is unavailable"]);
 let database;
 try {
-  if (!/^[a-f0-9-]{36}$/i.test(orderId || "") || (alertId && !/^\d{1,16}$/.test(alertId))) throw new Error("Use: node scripts/payment-diagnostic.mjs <order-id> [donation-id]");
+  const reference = /^CS2PAY-[a-f0-9]{32}$/i.test(orderIdentifier || "") ? "CS2PAY-" + orderIdentifier.slice(7).toLowerCase() : null;
+  if ((!reference && !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(orderIdentifier || "")) || (alertId && !/^\d{1,16}$/.test(alertId))) throw new Error(usage);
   database = new Database(databasePath(), { readonly: true, fileMustExist: true, timeout: 5000 });
-  const order = database.prepare("SELECT id,status,total_amount,quoted_currency,paid_at FROM orders WHERE id=?").get(orderId);
+  const order = reference ? database.prepare("SELECT o.id,o.status,o.total_amount,o.quoted_currency,o.paid_at FROM orders o JOIN payment_intents p ON p.order_id=o.id WHERE p.reference=?").get(reference) : database.prepare("SELECT id,status,total_amount,quoted_currency,paid_at FROM orders WHERE id=?").get(orderIdentifier.toLowerCase());
   if (!order) throw new Error("Order not found");
+  const orderId = order.id;
   const invoices = database.prepare("SELECT id,reference,account_id,amount,currency,status,expires_at FROM payment_intents WHERE order_id=? ORDER BY created_at DESC LIMIT 5").all(orderId);
   const references = new Set(invoices.map(invoice => invoice.reference));
   const local = invoices.map(invoice => ({ id: invoice.id, amount: invoice.amount / 100, currency: invoice.currency, status: invoice.status, expiresAt: new Date(invoice.expires_at).toISOString(), receipts: database.prepare("SELECT id,amount,currency,result,created_at FROM payment_receipts WHERE intent_id=? ORDER BY created_at DESC LIMIT 5").all(invoice.id).map(row => ({ id: row.id.split(":").at(-1), amount: row.amount / 100, currency: row.currency, result: row.result, recordedAt: new Date(row.created_at).toISOString() })) }));
@@ -28,7 +31,7 @@ try {
       if (String(raw?.id) !== alertId && (!donation || !references.has(donation.reference))) continue;
       const matchedInvoice = invoices.find(invoice => invoice.reference === donation?.reference);
       const amounts = {};
-      for (const name of ["amount", "currency", "original_amount", "original_currency", "amount_received", "amount_before_fees", "fee", "commission"]) {
+      for (const name of ["amount", "currency", "amount_in_user_currency", "original_amount", "original_currency", "amount_received", "amount_before_fees", "fee", "commission"]) {
         const value = raw[name];
         if ((typeof value === "number" && Number.isFinite(value)) || (typeof value === "string" && /^(?:[A-Z]{3}|\d{1,9}(?:\.\d{1,5})?)$/.test(value))) amounts[name] = value;
       }
@@ -40,7 +43,7 @@ try {
       const matchFailure = donation ? matchedInvoice ? null : "different_reference" : message === null ? "message_not_text" : !message.trim() ? "empty_message" : referenceCount === 0 ? "missing_or_incomplete_reference" : referenceCount > 1 ? "multiple_references" : "invalid_alert_fields";
       alerts.push({
         id: String(raw.id), fields: Object.keys(raw).sort().slice(0, 50), amounts,
-        amountType: typeof raw.amount, alertType: safeType(raw.name), messageType: safeType(raw.message_type),
+        amountType: typeof raw.amount, alertType: safeType(raw.name), messageType: safeType(raw.message_type), payinSystem: safeType(raw.payin_system),
         message: { type: typeof raw.message, length: message?.length ?? null, empty: message === null || message.trim().length === 0, referenceCount },
         matchFailure, validAlert: Boolean(donation), referenceMatches: Boolean(matchedInvoice),
         amountMatches: Boolean(expectedInvoice && validMinorAmount === expectedInvoice.amount),

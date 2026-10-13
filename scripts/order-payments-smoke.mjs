@@ -87,7 +87,7 @@ try {
   await call(checkout, other.cookie, { action: "check" }, 404);
   await call(checkout, client.cookie, { action: "check" }, 403, "POST", "https://evil.test");
   db.prepare("DELETE FROM auth_attempts").run();
-  writeFileSync(feedPath, JSON.stringify([{ id: 103, name: "donation", message: `Оплата: ${intent.reference.toUpperCase()}. Спасибо!`, amount: 400, currency: "RUB", is_shown: 1 }]));
+  writeFileSync(feedPath, JSON.stringify([{ id: 103, name: "donation", message: `Оплата: ${intent.reference.toUpperCase()}. Спасибо!`, amount: 400, currency: "RUB", amount_in_user_currency: 2148, payin_system: "manual", is_shown: 1 }]));
   const checked = (await call(checkout, client.cookie, { action: "check" })).data;
   assert.equal(checked.checked, true); assert.equal(checked.payment.intent.status, "review"); assert.equal(checked.results, undefined); assert.equal(checked.payment.issue, null);
   const matched = await get(id); assert.equal(matched.payment.intent.status, "review"); assert.equal(matched.order.paidAt, null); assert.equal(matched.order.status, "awaiting_payment");
@@ -97,6 +97,11 @@ try {
   assert.equal(report.requestedAlertFound, true); assert.equal(report.providerAlerts[0].amountMatches, true); assert.equal(report.providerAlerts[0].currencyMatches, true);
   assert(!diagnostic.stdout.includes("access-token")); assert(!diagnostic.stdout.includes(env.DONATIONALERTS_CLIENT_SECRET)); assert(!diagnostic.stdout.includes("Оплата:"));
   assert.equal(report.providerAlerts[0].message.referenceCount, 1); assert.equal(report.providerAlerts[0].matchFailure, null);
+  const referenceDiagnostic = spawnSync(process.execPath, ["--import", pathToFileURL(preloadPath).href, "scripts/payment-diagnostic.mjs", intent.reference.toLowerCase(), "103"], { env, encoding: "utf8", windowsHide: true });
+  assert.equal(referenceDiagnostic.status, 0, referenceDiagnostic.stderr);
+  const referenceReport = JSON.parse(referenceDiagnostic.stdout);
+  assert.equal(referenceReport.order.id, id); assert.equal(referenceReport.providerAlerts[0].amounts.amount, 400);
+  assert.equal(referenceReport.providerAlerts[0].amounts.amount_in_user_currency, 2148); assert.equal(referenceReport.providerAlerts[0].payinSystem, "manual");
   writeFileSync(feedPath, JSON.stringify([{ id: 192410974, name: "donation", message_type: "text", message: "", amount: 400, currency: "RUB" }]));
   const emptyDiagnostic = spawnSync(process.execPath, ["--import", pathToFileURL(preloadPath).href, "scripts/payment-diagnostic.mjs", id, "192410974"], { env, encoding: "utf8", windowsHide: true });
   assert.equal(emptyDiagnostic.status, 0, emptyDiagnostic.stderr);
