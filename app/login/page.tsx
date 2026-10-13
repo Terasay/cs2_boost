@@ -26,9 +26,9 @@ export default function Login() {
     setLoading(true); setError("");
     try {
       if (secondFactor) {
-        await api("/api/auth/two-factor-login", { method: "POST", body: JSON.stringify({ code }) });
+        await api("/api/auth/two-factor-login", { method: "POST", signal: AbortSignal.timeout(15000), body: JSON.stringify({ code }) });
       } else {
-        const result = await api<{ twoFactorRequired?: boolean }>("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+        const result = await api<{ twoFactorRequired?: boolean }>("/api/auth/login", { method: "POST", signal: AbortSignal.timeout(15000), body: JSON.stringify({ email, password }) });
         setPassword("");
         if (result.twoFactorRequired) { setSecondFactor(true); setCode(""); setLoading(false); return; }
       }
@@ -40,13 +40,13 @@ export default function Login() {
     if (loading) return;
     setLoading(true); setError("");
     try {
-      await api("/api/auth/logout", { method: "POST" });
+      await api("/api/auth/logout", { method: "POST", signal: AbortSignal.timeout(15000) });
       setSecondFactor(false); setRecovery(false); setCode("");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Error"); }
     finally { setLoading(false); }
   }
 
-  return <AccountShell><div className="login-layout"><div><div className="account-intro"><span className="kicker">CS2 BOOST</span><h1>{secondFactor ? t("Подтвердите вход", "Verify your sign-in") : t("Вход в аккаунт", "Sign in")}</h1><p>{secondFactor ? t("Остался код из приложения на телефоне.", "Enter the code from your authenticator app.") : t("Вернитесь к заказам и переписке с администратором.", "Return to your orders and admin chat.")}</p></div><form className="account-panel account-narrow" onSubmit={submit}>
+  return <AccountShell><div className="login-layout"><div className="login-copy"><div className="account-intro"><span className="kicker">CS2 BOOST</span><h1>{secondFactor ? t("Подтвердите вход", "Verify your sign-in") : t("Вход в аккаунт", "Sign in")}</h1><p>{secondFactor ? t("Остался код из приложения на телефоне.", "Enter the code from your authenticator app.") : t("Вернитесь к заказам и переписке с администратором.", "Return to your orders and admin chat.")}</p></div><form className="account-panel account-narrow" onSubmit={submit}>
     {secondFactor ? <><ShieldCheck className="security-icon" size={27}/><p className="mfa-login-email">{email}</p><label htmlFor="verification-code">{recovery ? t("Резервный код", "Recovery code") : t("Код из приложения", "Authenticator code")}</label><Input key={recovery ? "recovery" : "totp"} id="verification-code" type="text" inputMode={recovery ? "text" : "numeric"} autoComplete="one-time-code" autoFocus required maxLength={recovery ? 32 : 6} pattern={recovery ? undefined : "[0-9]{6}"} value={code} onChange={event => setCode(event.target.value)}/><small>{recovery ? t("Введите один из сохранённых резервных кодов. Каждый используется один раз.", "Enter one saved recovery code. Each can be used once.") : t("Шесть цифр из приложения. Если код уже использован, дождитесь нового.", "Enter six digits from your authenticator. If already used, wait for a new code.")}</small><p className="mfa-hint">{t("На подтверждение есть 5 минут. Если время истекло, вернитесь к вводу пароля.", "Verification expires after 5 minutes. If expired, return to the password step.")}</p></> : <><label htmlFor="email">Email</label><Input id="email" type="email" disabled={!ready} required autoComplete="email" value={email} onChange={event => setEmail(event.target.value)}/><label htmlFor="password">{t("Пароль", "Password")}</label><Input id="password" type="password" disabled={!ready} required autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)}/></>}
     {!secondFactor && <a className="login-recovery-link" href="/forgot-password">{t("Забыли пароль?", "Forgot password?")}</a>}
     {error && <p className="error" role="alert">{error}</p>}<Button type="submit" className="account-cta" disabled={loading || !ready}>{!ready ? t("Загружаем…", "Loading…") : loading ? "…" : secondFactor ? t("Подтвердить вход", "Verify sign-in") : t("Войти", "Sign in")}<ArrowRight size={18}/></Button>

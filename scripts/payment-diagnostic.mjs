@@ -32,7 +32,22 @@ try {
         const value = raw[name];
         if ((typeof value === "number" && Number.isFinite(value)) || (typeof value === "string" && /^(?:[A-Z]{3}|\d{1,9}(?:\.\d{1,5})?)$/.test(value))) amounts[name] = value;
       }
-      alerts.push({ id: String(raw.id), fields: Object.keys(raw).sort().slice(0, 50), amounts, amountType: typeof raw.amount, validAlert: Boolean(donation), referenceMatches: Boolean(matchedInvoice), amountMatches: Boolean(matchedInvoice && donation.amount === matchedInvoice.amount), currencyMatches: Boolean(matchedInvoice && donation.currency === matchedInvoice.currency), containsOrderReference: typeof raw.message === "string" && invoices.some(invoice => raw.message.toUpperCase().includes(invoice.reference.toUpperCase())), validMinorAmount: donationMinorAmount(raw.amount) });
+      const message = typeof raw.message === "string" ? raw.message : null;
+      const referenceCount = message === null ? 0 : [...message.matchAll(/(?<![a-z0-9_-])CS2(?:TEST|PAY)-[a-f0-9]{32}(?![a-z0-9_-])/gi)].length;
+      const safeType = value => typeof value === "string" && /^[a-z_]{1,32}$/i.test(value) ? value : typeof value === "number" && Number.isSafeInteger(value) ? value : null;
+      const expectedInvoice = matchedInvoice ?? invoices[0];
+      const validMinorAmount = donationMinorAmount(raw.amount);
+      const matchFailure = donation ? matchedInvoice ? null : "different_reference" : message === null ? "message_not_text" : !message.trim() ? "empty_message" : referenceCount === 0 ? "missing_or_incomplete_reference" : referenceCount > 1 ? "multiple_references" : "invalid_alert_fields";
+      alerts.push({
+        id: String(raw.id), fields: Object.keys(raw).sort().slice(0, 50), amounts,
+        amountType: typeof raw.amount, alertType: safeType(raw.name), messageType: safeType(raw.message_type),
+        message: { type: typeof raw.message, length: message?.length ?? null, empty: message === null || message.trim().length === 0, referenceCount },
+        matchFailure, validAlert: Boolean(donation), referenceMatches: Boolean(matchedInvoice),
+        amountMatches: Boolean(expectedInvoice && validMinorAmount === expectedInvoice.amount),
+        currencyMatches: Boolean(expectedInvoice && raw.currency === expectedInvoice.currency),
+        containsOrderReference: message !== null && invoices.some(invoice => message.toUpperCase().includes(invoice.reference.toUpperCase())),
+        validMinorAmount,
+      });
     }
     if (!batch.hasMore || (alertId && alerts.some(alert => alert.id === alertId))) break;
   }

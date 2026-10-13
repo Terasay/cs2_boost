@@ -63,7 +63,7 @@ export function OrderPayment({ order, payment, admin, ru, busy, run, reload }: {
 
   async function copyReference() {
     if (!invoice) return;
-    try { await navigator.clipboard.writeText(invoice.reference); setFeedback(t("Код скопирован", "Reference copied")); }
+    try { await navigator.clipboard.writeText(invoice.reference); setFeedback(t("Код скопирован. Вставьте его в поле сообщения DonationAlerts перед оплатой.", "Reference copied. Paste it into the DonationAlerts message field before paying.")); }
     catch { setError(t("Выделите код и скопируйте вручную.", "Select the reference and copy it manually.")); }
   }
 
@@ -91,7 +91,7 @@ export function OrderPayment({ order, payment, admin, ru, busy, run, reload }: {
       <div className="checkout-reference"><small>{t("Код для комментария к оплате", "Payment comment reference")}</small><code>{invoice.reference}</code><button className="secondary-action" type="button" onClick={copyReference}><Copy size={15}/>{t("Скопировать код", "Copy reference")}</button></div>
       {invoice.expired ? <><p className="payment-sync-warning">{t("Срок кода истёк. Уже отправленный перевод проверит администратор — напишите в чат.", "This reference expired. Contact the chat so the admin can verify any transfer already sent.")}</p><details className="inspector-breakdown"><summary>{t("Я ещё не отправлял деньги", "I have not paid yet")}</summary><button className="secondary-action" type="button" disabled={working || busy} onClick={checkout}>{t("Подготовить новый код", "Prepare a new reference")}</button></details></> : !issue && <>
         <ol className="payment-steps">
-          <li><span>1</span><div><strong>{t("Скопируйте код выше", "Copy the reference above")}</strong><small>{t("Вставьте его целиком в комментарий DonationAlerts. Дополнительный текст не мешает, если код указан один.", "Paste it into the DonationAlerts comment. Extra text is allowed if there is only one reference.")}</small></div></li>
+          <li><span>1</span><div><strong>{t("Вставьте код в сообщение DonationAlerts", "Paste the reference into the DonationAlerts message")}</strong><small>{t("Скопируйте код целиком и перед оплатой проверьте, что он виден в поле сообщения. Без кода платёж сможет подтвердить только администратор вручную.", "Copy the complete reference and check it is visible in the message field before paying. Without it, only the admin can verify payment manually.")}</small></div></li>
           <li><span>2</span><div><strong>{t("Отправьте указанную сумму в RUB", "Pay the stated RUB amount")}</strong><small>{t("Выберите рубли на странице оплаты. Комиссия сервиса может уменьшить баланс получателя.", "Select RUB on the payment page. Provider fees may reduce the recipient's balance.")}</small></div></li>
           <li><span>3</span><div><strong>{t("Вернитесь сюда и проверьте статус", "Return here and check the status")}</strong><small>{t("Сайт найдёт уведомление, затем администратор подтвердит поступление.", "The site matches the alert, then the admin verifies receipt.")}</small></div></li>
         </ol>{paymentLink}

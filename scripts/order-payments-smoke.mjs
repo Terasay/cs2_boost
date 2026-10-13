@@ -96,6 +96,16 @@ try {
   const report = JSON.parse(diagnostic.stdout);
   assert.equal(report.requestedAlertFound, true); assert.equal(report.providerAlerts[0].amountMatches, true); assert.equal(report.providerAlerts[0].currencyMatches, true);
   assert(!diagnostic.stdout.includes("access-token")); assert(!diagnostic.stdout.includes(env.DONATIONALERTS_CLIENT_SECRET)); assert(!diagnostic.stdout.includes("Оплата:"));
+  assert.equal(report.providerAlerts[0].message.referenceCount, 1); assert.equal(report.providerAlerts[0].matchFailure, null);
+  writeFileSync(feedPath, JSON.stringify([{ id: 192410974, name: "donation", message_type: "text", message: "", amount: 400, currency: "RUB" }]));
+  const emptyDiagnostic = spawnSync(process.execPath, ["--import", pathToFileURL(preloadPath).href, "scripts/payment-diagnostic.mjs", id, "192410974"], { env, encoding: "utf8", windowsHide: true });
+  assert.equal(emptyDiagnostic.status, 0, emptyDiagnostic.stderr);
+  const emptyAlert = JSON.parse(emptyDiagnostic.stdout).providerAlerts[0];
+  assert.equal(emptyAlert.message.empty, true); assert.equal(emptyAlert.matchFailure, "empty_message");
+  assert.equal(emptyAlert.amountMatches, true); assert.equal(emptyAlert.currencyMatches, true); assert.equal(emptyAlert.referenceMatches, false);
+  db.prepare("DELETE FROM auth_attempts").run();
+  assert.deepEqual((await sync()).results, {}); assert.equal((await get(id)).order.paidAt, null);
+  writeFileSync(feedPath, JSON.stringify([{ id: 103, name: "donation", message: intent.reference, amount: 400, currency: "RUB" }]));
   assert.equal(db.prepare("SELECT count(*) AS n FROM promo_earnings").get().n, 0);
   db.prepare("DELETE FROM auth_attempts").run(); assert.equal((await sync()).results.duplicate, 1);
   assert.equal(db.prepare("SELECT count(*) AS n FROM payment_receipts WHERE result='matched'").get().n, 1);

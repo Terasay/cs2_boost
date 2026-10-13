@@ -1,0 +1,62 @@
+.login-layout {
+  display: grid;
+  grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr);
+  align-items: stretch;
+  gap: 0;
+  width: min(100%, 1040px);
+  margin: 0 auto;
+  border: 1px solid #343a43;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #171b20;
+}
+
+.login-copy { min-width: 0; padding: clamp(26px, 3.5vw, 44px); }
+.login-layout .account-intro { max-width: none; margin-bottom: 28px; }
+.login-layout .account-intro h1 { font-size: clamp(36px, 3.5vw, 48px); line-height: 1.08; margin: 16px 0 14px; }
+.login-layout .account-intro p { line-height: 1.65; }
+.login-layout .account-panel { width: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; animation: none; }
+.login-layout .account-panel > label { margin: 20px 0 9px; }
+.login-layout .account-panel > label:first-child { margin-top: 0; }
+.login-layout .account-panel [data-slot=input] { min-height: 48px; font-size: 16px; background: #111419; }
+.login-layout .account-cta { min-height: 48px; margin-top: 14px; }
+.login-layout .login-recovery-link { margin: 12px 0 18px; }
+.login-layout .account-footnote { margin: 24px 0 0; font-size: 13px; line-height: 1.6; }
+.login-layout .error { margin: 16px 0; overflow-wrap: anywhere; }
+.login-layout .login-media { display: block; min-height: 480px; height: auto; margin: 0; border: 0; border-left: 1px solid #343a43; border-radius: 0; }
+.login-layout .login-media img { position: absolute; inset: 0; object-fit: cover; }
+.login-layout .login-media-caption { left: 30px; right: 30px; bottom: 34px; }
+.login-layout .login-media-caption strong { font-size: clamp(28px, 2.7vw, 36px); line-height: 1.12; }
+.login-layout .mfa-login-email { margin: 0 0 16px; }
+.login-layout .security-icon { margin-bottom: 12px; }
+.login-layout .mfa-login-actions button { min-height: 44px; white-space: normal; }
+.login-layout .mfa-hint { font-size: 13px; line-height: 1.65; color: #a6afba; }
+
+.account-page input:autofill {
+  color: #e0e5ed;
+  caret-color: #e0e5ed;
+  box-shadow: 0 0 0 1000px #111419 inset;
+}
+.account-page input:-webkit-autofill {
+  -webkit-text-fill-color: #e0e5ed;
+  caret-color: #e0e5ed;
+  -webkit-box-shadow: 0 0 0 1000px #111419 inset;
+}
+.account-page input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #111419 inset, 0 0 0 3px #f9a64a22;
+}
+
+@media (max-width: 900px) {
+  .login-layout { grid-template-columns: minmax(0, 1fr); max-width: 500px; }
+  .login-layout .login-media { display: none; }
+  .login-layout .account-intro h1 { font-size: 40px; }
+}
+
+@media (max-width: 480px) {
+  .login-copy { padding: 24px; }
+  .login-layout .account-intro { margin-bottom: 24px; }
+  .login-layout .account-intro h1 { font-size: 36px; }
+  .login-layout .account-intro p { font-size: 13px; }
+  .login-layout .account-footnote a { display: inline-block; padding: 8px 0; }
+  .login-layout .login-recovery-link { padding: 6px 0; margin: 8px 0 12px; }
+}
