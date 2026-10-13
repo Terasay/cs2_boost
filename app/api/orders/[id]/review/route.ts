@@ -43,7 +43,7 @@ export const PATCH = safeApi(async request => {
     const review = tx.select().from(orderReviews).where(eq(orderReviews.orderId, orderId(request))).get();
     if (!review) return privateJson({ error: "Review not found" }, 404);
     if (review.updatedAt !== input.updatedAt) return privateJson({ error: "Review changed. Refresh and try again" }, 409);
-    const updated = { ...review, published: input.published, updatedAt: Math.max(Date.now(), review.updatedAt + 1) };
+    const updated = { ...review, published: Boolean(input.published), updatedAt: Math.max(Date.now(), review.updatedAt + 1) };
     tx.update(orderReviews).set({ published: updated.published, updatedAt: updated.updatedAt }).where(eq(orderReviews.id, review.id)).run();
     return privateJson({ review: updated });
   });

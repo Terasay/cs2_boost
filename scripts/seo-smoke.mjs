@@ -4,7 +4,7 @@ const base = process.env.SITE_TEST_URL || "http://127.0.0.1:3000";
 if (!["127.0.0.1", "localhost"].includes(new URL(base).hostname)) throw new Error("Run this check against a local server");
 const indexable = process.env.SITE_EXPECT_INDEXING === "1";
 const canonicalOrigin = process.env.SITE_CANONICAL_ORIGIN;
-const slugs = ["", "premier-boost", "faceit-boost", "calibration"];
+const slugs = ["", "premier-boost", "faceit-boost", "calibration", "reviews"];
 for (const lang of ["ru", "en"]) for (const slug of slugs) {
   const path = `/${lang}${slug ? `/${slug}` : ""}`;
   const response = await fetch(base + path, { headers: { "User-Agent": "Googlebot" } });
@@ -49,7 +49,7 @@ const yandex = await fetch(base + "/ru", { headers: { "User-Agent": "YandexBot" 
 assert.equal(yandex.status, 200);
 assert.match(await yandex.text(), /<meta name="description" content="[^"]{50,}"/);
 const map = await fetch(base + "/sitemap.xml").then(response => response.text());
-assert.equal((map.match(/<loc>/g) || []).length, indexable ? 8 : 0);
+assert.equal((map.match(/<loc>/g) || []).length, indexable ? 10 : 0);
 assert.doesNotMatch(map, /dashboard|orders|support|analytics|localhost|127\.0\.0\.1/);
 for (const path of ["/account", "/dashboard", "/analytics", "/login", "/register", "/inbox", "/support"]) {
   const response = await fetch(base + path);
@@ -66,4 +66,4 @@ for (const code of ["Cherep", "Terasay"]) {
 }
 assert.equal((await fetch(base + "/de/premier-boost")).status, 404);
 assert.equal((await fetch(base + "/ru/not-a-service")).status, 404);
-console.log(JSON.stringify({ ok: true, indexable, localizedPages: 8, privatePagesNoindex: true, canonicalAndSitemap: true }));
+console.log(JSON.stringify({ ok: true, indexable, localizedPages: 10, privatePagesNoindex: true, canonicalAndSitemap: true }));

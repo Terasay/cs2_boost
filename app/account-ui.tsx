@@ -37,6 +37,11 @@ export class ApiError extends Error {
 }
 
 const errorMessages: Record<string, string> = {
+  "Only the order owner can review": "Отзыв может оставить только клиент этого заказа.",
+  "Enter a rating, public nickname and 10–1500 character review": "Выберите оценку, укажите ник от 2 до 40 символов без email и текст от 10 до 1 500 символов.",
+  "Review available after order completion": "Оставить отзыв можно после завершения заказа.",
+  "Review changed. Refresh and try again": "Отзыв уже изменён. Обновите заказ и попробуйте ещё раз.",
+  "Review not found": "Отзыв ещё не опубликован.",
   "Recovery email unavailable. Try again later": "Не удалось подготовить письмо для восстановления. Попробуйте позже.",
   "Reset link is invalid or expired": "Ссылка недействительна, уже использована или истекла. Запросите новую.",
   "Invalid notification settings": "Проверьте настройки уведомлений.",

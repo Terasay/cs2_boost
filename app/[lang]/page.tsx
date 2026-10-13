@@ -3,6 +3,7 @@ import Home from "../home";
 import { isLanguage } from "@/lib/marketing";
 import { pageMetadata } from "@/lib/seo";
 import { siteOrigin } from "@/lib/seo-config.mjs";
+import { publicReviews } from "@/lib/reviews";
 
 type Props = { params: Promise<{ lang: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
@@ -23,6 +24,6 @@ export default async function LocalizedHome({ params, searchParams }: Props) {
   } : null;
   return <>
     {website && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(website).replace(/</g, "\\u003c") }}/>}
-    <Home lang={lang} initialPlatform={query.platform === "faceit" ? "faceit" : "premier"} initialService={query.service === "calibration" ? "calibration" : "rating"}/>
+    <Home lang={lang} reviews={publicReviews(1, 3)} initialPlatform={query.platform === "faceit" ? "faceit" : "premier"} initialService={query.service === "calibration" ? "calibration" : "rating"}/>
   </>;
 }

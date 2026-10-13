@@ -13,6 +13,8 @@ import { AnimatedNumber, ObjectiveHud, RatingControl } from "./tactical-ui";
 import { MarketingHeader, MarketingFooter } from "./marketing-ui";
 import { PlayingMethods, AccountShowcase } from "./home-showcase";
 import { HomeFaq, SecuritySection, ServiceObjective } from "./marketing-trust";
+import { ReviewsSection } from "./review-cards";
+import type { ReviewPage } from "@/lib/reviews";
 import { commonCopy, services, serviceSlugs, type Language as Lang } from "@/lib/marketing";
 type Platform = "premier" | "faceit";
 type Service = "rating" | "calibration";
@@ -45,7 +47,7 @@ const words = {
   }
 };
 
-export default function Home({ lang, initialPlatform = "premier", initialService = "rating" }: { lang: Lang; initialPlatform?: Platform; initialService?: Service }) {
+export default function Home({ lang, reviews, initialPlatform = "premier", initialService = "rating" }: { lang: Lang; reviews: ReviewPage; initialPlatform?: Platform; initialService?: Service }) {
   const [platform,setPlatform]=useState<Platform>(initialPlatform);
   const [service,setService]=useState<Service>(initialService);
   const [method,setMethod]=useState<Method>("duo");
@@ -163,6 +165,7 @@ export default function Home({ lang, initialPlatform = "premier", initialService
       <PlayingMethods lang={lang} selected={method} onSelect={value => { setMethod(value); focusCalculator("calculator-method"); }}/>
       <AccountShowcase lang={lang}/>
       <SecuritySection lang={lang}/>
+      <ReviewsSection report={reviews} lang={lang}/>
       <section className="tactical-section faq-section" id="faq"><div className="wrap faq-layout"><div className="faq-help"><span className="kicker">07 // INTEL</span><h2>{lang === "ru" ? "До начала матча." : "Before the first match."}</h2><p>{lang === "ru" ? "Коротко о цене, заказе и формате игры. Остальное обсудим в чате." : "Price, order and playing method. We can discuss the rest in chat."}</p><a href="/support"><MessageSquare size={16}/>{lang === "ru" ? "Спросить администратора" : "Ask an admin"}<ArrowUpRight size={16}/></a></div><HomeFaq lang={lang} orderQuestions={[{question:t.q1,answer:t.a1},{question:t.q2,answer:t.a2},{question:t.q3,answer:t.a3},...commonCopy[lang].questions]}/></div></section>
     </main>
     <MarketingFooter lang={lang}/>

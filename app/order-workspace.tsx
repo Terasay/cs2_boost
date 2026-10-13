@@ -7,10 +7,12 @@ import { ConversationPanel } from "./conversation-panel";
 import { useLiveResource } from "./use-live-resource";
 import { OrderActions, OrderHistory, OrderTimer, SecureOrderAccess, type AccessInfo, type Order, type OrderEvent } from "./order-controls";
 import { OrderPayment, type PaymentInfo } from "./order-payment";
+import { OrderReviewPanel } from "./order-review";
+import type { OrderReview } from "@/lib/reviews";
 import { money } from "@/lib/pricing.mjs";
 import type { ChatMessage, ChatPage } from "./chat-history";
 
-type Detail = ChatPage & { order: Order; access: AccessInfo; payment: PaymentInfo; events: OrderEvent[]; currentUserId: string; role: "client" | "admin" };
+type Detail = ChatPage & { order: Order; access: AccessInfo; payment: PaymentInfo; review: OrderReview | null; events: OrderEvent[]; currentUserId: string; role: "client" | "admin" };
 
 export default function OrderWorkspace({ id, embedded = false, onActivity }: { id: string; embedded?: boolean; onActivity?: () => void }) {
   const lang = useLanguage();
@@ -26,7 +28,7 @@ export default function OrderWorkspace({ id, embedded = false, onActivity }: { i
   const [busy, setBusy] = useState(false);
   const actionPending = useRef(false);
   const [error, setError] = useState("");
-  const pane = selectedPane ?? (data?.role === "client" && ["quoted", "awaiting_payment", "awaiting_access"].includes(order?.status || "") ? "order" : "chat");
+  const pane = selectedPane ?? (data?.role === "client" && ["quoted", "awaiting_payment", "awaiting_access", "completed"].includes(order?.status || "") ? "order" : "chat");
   const tabs = useRef<HTMLElement>(null);
   const panelId = useId();
   useEffect(() => {
@@ -63,6 +65,7 @@ export default function OrderWorkspace({ id, embedded = false, onActivity }: { i
     {(resource.error || error) && <p className="error" role="alert">{error || resource.error}</p>}
     {data && order && <><ol className="order-flow">{(ru ? ["Заявка","Принятие","Оплата","Данные","Выполнение"] : ["Request","Accepted","Payment","Details","Delivery"]).map((label,index)=>{const stage=order.status === "completed" ? 5 : order.status === "in_progress" || order.startedAt ? 4 : order.paidAt ? 3 : order.status === "awaiting_payment" ? 2 : order.status === "quoted" ? 1 : 0;return <li key={label} aria-current={order.status !== "cancelled" && index === stage ? "step" : undefined} className={order.status === "cancelled" ? "" : index < stage ? "done" : index === stage ? "current" : ""}><span>{index+1}</span>{label}</li>})}</ol>
       <OrderNextStep order={order} access={data.access} payment={data.payment} admin={data.role === "admin"} ru={ru}/>
+      {order.status === "completed" && data.role === "client" && <div className="completed-order-actions"><button className="secondary-action" type="button" onClick={() => { selectPane("order"); requestAnimationFrame(() => document.getElementById(`${panelId}-review`)?.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" })); }}>{data.review ? (ru ? "Посмотреть свой отзыв" : "View your review") : (ru ? "Оставить отзыв" : "Leave a review")}</button></div>}
       <nav className="order-pane-tabs" ref={tabs} aria-label={ru ? "Разделы заказа" : "Order sections"}>
         <button type="button" aria-pressed={pane === "chat"} aria-controls={`${panelId}-chat`} onClick={() => selectPane("chat")}><MessagesSquare size={17}/>{ru ? "Чат" : "Chat"}</button>
         <button type="button" aria-pressed={pane === "order"} aria-controls={`${panelId}-order`} onClick={() => selectPane("order")}><ClipboardList size={17}/>{data.role === "admin" ? (ru ? "Управление" : "Manage order") : (ru ? "Заказ и оплата" : "Order & payment")}</button>
@@ -84,6 +87,7 @@ export default function OrderWorkspace({ id, embedded = false, onActivity }: { i
       {data.role !== "admin" && <OrderTimer order={order} ru={ru}/>}
       {data.role !== "admin" && <><OrderPayment key={`payment-${order.id}`} order={order} payment={data.payment} admin={false} ru={ru} busy={busy} run={run} reload={()=>{void reload();onActivity?.();}}/><OrderActions key={`actions-${order.id}`} order={order} admin={false} ru={ru} busy={busy} error={error} run={run}/></>}
       {data.role !== "admin" && <SecureOrderAccess key={`access-${order.id}`} order={order} admin={false} info={data.access} ru={ru} onSaved={()=>{void reload();onActivity?.();}}/>}
+      <OrderReviewPanel key={`review-${order.id}`} id={`${panelId}-review`} order={order} review={data.review} admin={data.role === "admin"} ru={ru} onSaved={review => { update(value => ({ ...value, review })); void reload(); }}/>
       <OrderHistory events={data.events} order={order} ru={ru}/>
     </div></section><div className="order-chat-pane" id={`${panelId}-chat`}><ConversationPanel endpoint={endpoint} page={data} currentUserId={data.currentUserId} role={data.role} lang={lang} onSent={sent} onRefresh={reload} offline={Boolean(resource.error)} refreshing={resource.loading}/></div></div></>}
   </div>;
@@ -104,6 +108,10 @@ function OrderNextStep({ order, access, payment, admin, ru }: { order: Order; ac
   } else if (order.status === "awaiting_access") {
     title = access ? (ru ? "Данные на проверке" : "Details under review") : (ru ? "Оплата подтверждена" : "Payment confirmed");
     description = admin ? (ru ? "Проверьте данные клиента и подтвердите получение, чтобы начать выполнение." : "Review the client's details and confirm receipt to start delivery.") : access ? (ru ? "Администратор проверит переданные данные и запустит выполнение." : "The admin will review the submitted details and start delivery.") : order.method === "duo" ? (ru ? "Откройте заказ и передайте код дружбы Steam через отдельную форму." : "Open Order & payment to submit your Steam friend code.") : (ru ? "Откройте заказ и передайте данные Steam через защищённую форму, а не в чат." : "Open Order & payment to submit Steam details in the secure form, not the chat.");
+  }
+  if (order.status === "completed") {
+    title = ru ? "Заказ завершён" : "Order completed";
+    description = admin ? (ru ? "Заказ и переписка сохранены в истории. Клиент может оставить отзыв." : "The order and conversation remain in history. The client can leave a review.") : (ru ? "Заказ и чат остаются доступны. Оцените работу и поделитесь своим опытом." : "Your order and chat remain available. Rate the service and share your experience.");
   }
   return title ? <div className="order-next-step"><span><strong>{title}</strong><small>{description}</small></span></div> : null;
 }

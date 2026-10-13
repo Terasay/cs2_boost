@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export default function sitemap(): MetadataRoute.Sitemap {
   if (!searchEnabled()) return [];
   const origin = siteOrigin();
-  return languages.flatMap(lang => ["", ...serviceSlugs].map(slug => ({
+  return languages.flatMap(lang => ["", ...serviceSlugs, "reviews"].map(slug => ({
     url: `${origin}/${lang}${slug ? `/${slug}` : ""}`,
     alternates: { languages: { ru: `${origin}/ru${slug ? `/${slug}` : ""}`, en: `${origin}/en${slug ? `/${slug}` : ""}` } },
   })));
