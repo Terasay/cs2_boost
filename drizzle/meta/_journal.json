@@ -85,6 +85,13 @@
       "when": 1791667456175,
       "tag": "0011_account_recovery_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1791906701192,
+      "tag": "0012_order_reviews",
+      "breakpoints": true
     }
   ]
 }

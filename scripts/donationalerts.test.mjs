@@ -11,8 +11,8 @@ test("explicit modes distinguish simulations from order matching", () => {
   const previous = process.env.DONATIONALERTS_MODE;
   try {
     delete process.env.DONATIONALERTS_MODE; assert.equal(donationConfig().enabled, false);
-    process.env.DONATIONALERTS_MODE = "test"; assert.equal(donationConfig().enabled, true);
-    process.env.DONATIONALERTS_MODE = "orders"; assert.equal(donationConfig().mode, "orders");
+    process.env.DONATIONALERTS_MODE = "test"; assert.equal(donationConfig().enabled, true); assert.equal(donationConfig().autoConfirm, false);
+    process.env.DONATIONALERTS_MODE = "orders"; assert.equal(donationConfig().mode, "orders"); assert.equal(donationConfig().autoConfirm, true);
     process.env.DONATIONALERTS_MODE = "live"; assert.throws(donationConfig);
   } finally { if (previous === undefined) delete process.env.DONATIONALERTS_MODE; else process.env.DONATIONALERTS_MODE = previous; }
 });
@@ -29,6 +29,15 @@ test("only typed donation alerts with one complete unpredictable reference are c
   assert.deepEqual(normalizeDonation({ ...fixture, message: `Оплата заказа (${reference.toUpperCase()}). Спасибо!` }), normalizeDonation(fixture));
   for (const message of ["", " ", null, undefined, "Оплатил 100 рублей", "CS2PAY-" + "ab".repeat(15)]) assert.equal(normalizeDonation({ ...fixture, amount: 100, message }), null);
   for (const extra of [{ name: "custom" }, { message_type: "audio" }, { id: "123" }, { id: 0 }, { id: 1.5 }, { message: `${reference} ${reference}` }, { message: `x${reference}` }, { message: `${reference}0` }, { message: "CS2TEST-ab" }, { message: "x".repeat(2001) }, { currency: "rub" }, { amount: "500.01" }, { amount: 500.001 }]) assert.equal(normalizeDonation({ ...fixture, ...extra }), null);
+});
+
+test("production Donations alerts match the original RUB amount, not the converted account balance", () => {
+  const paymentReference = "CS2PAY-" + "a0".repeat(16);
+  const raw = { id: 192419486, name: "Donations", message_type: "text", message: paymentReference, amount: 120, currency: "RUB", amount_in_user_currency: 644.40236928932, payin_system: null };
+  const expected = { id: "192419486", reference: paymentReference, amount: 12000, currency: "RUB" };
+  for (const name of ["donation", "Donation", "donations", "Donations"]) assert.deepEqual(normalizeDonation({ ...raw, name }), expected);
+  assert.equal(donationMatch({ reference: paymentReference, status: "pending", amount: 12000, currency: "RUB", expiresAt: 2000 }, normalizeDonation(raw), 1000), "matched");
+  for (const name of [null, undefined, 1, "Subscription", "custom", "donations_other", " Donations "]) assert.equal(normalizeDonation({ ...raw, name }), null);
 });
 
 test("exact amounts, currencies, deadlines and already matched tests are checked", () => {

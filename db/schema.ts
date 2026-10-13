@@ -152,6 +152,17 @@ export const orderEvents = sqliteTable("order_events", {
   createdAt: integer("created_at").notNull(),
 }, table => [index("order_events_order_idx").on(table.orderId, table.createdAt)]);
 
+export const orderReviews = sqliteTable("order_reviews", {
+  id: text("id").primaryKey(),
+  orderId: text("order_id").notNull().unique().references(() => orders.id, { onDelete: "cascade" }),
+  rating: integer("rating").notNull(),
+  authorName: text("author_name").notNull(),
+  body: text("body").notNull(),
+  published: integer("published", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+}, table => [index("order_reviews_public_idx").on(table.published, table.createdAt)]);
+
 export const promoEarnings = sqliteTable("promo_earnings", {
   orderId: text("order_id").primaryKey().references(() => orders.id, { onDelete: "cascade" }),
   promoCode: text("promo_code").notNull(),

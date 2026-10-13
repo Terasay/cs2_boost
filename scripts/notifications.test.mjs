@@ -66,6 +66,15 @@ test("order updates reach the opposite party once and respect verified addresses
   assert.match(f.letters.find(l => l.to === "client@example.test").subject, /Order terms accepted/);
 });
 
+test("automatic payment confirmation notifies the client and verified admins once", async t => {
+  const f = fixture(t);
+  const event = { orderId: "order", actorId: "client", type: "confirm_payment", eventId: "automatic-paid", origin, automatic: true };
+  enqueueOrderEvent(f.db, event); enqueueOrderEvent(f.db, event);
+  assert.deepEqual(f.db.prepare("SELECT recipient FROM mail_outbox ORDER BY recipient").all(), [{ recipient: "admin@example.test" }, { recipient: "client@example.test" }]);
+  await processMailQueue(f.db, { now: Date.now() + 1, send: f.send });
+  assert.equal(f.letters.length, 2);
+});
+
 test("chat bursts wait five minutes and send one generic reminder", async t => {
   const f = fixture(t);
   f.message("admin", f.now); f.message("admin", f.now + 1);

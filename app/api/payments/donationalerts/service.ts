@@ -4,6 +4,7 @@ import { getDb } from "@/db";
 import { donationConnections, donationTestEvents, donationTests, orders, paymentIntents, paymentReceipts, serviceState } from "@/db/schema";
 import { enqueueOrderEvent } from "@/lib/notifications.mjs";
 import { publicOrigin } from "@/lib/server-config.mjs";
+import { confirmOrderPayment } from "@/lib/confirm-order-payment";
 import { openAccess, sealAccess } from "@/lib/order-access.mjs";
 import { donationConfig, donationMatch, donationPage, donationScopes, donationToken, normalizeDonation, type Donation, type DonationTokens } from "@/lib/donationalerts.mjs";
 
@@ -40,7 +41,7 @@ export function paymentTestStatus() {
   const tests = db.select().from(donationTests).orderBy(desc(donationTests.createdAt)).limit(20).all();
   const events = db.select().from(donationTestEvents).orderBy(desc(donationTestEvents.createdAt)).limit(30).all();
   const payments = db.select().from(paymentIntents).orderBy(desc(sql`${paymentIntents.status} = 'review'`), desc(paymentIntents.createdAt)).limit(50).all();
-  return { enabled: config.enabled, mode: config.mode, oauthConfigured: /^\d+$/.test(config.clientId) && Boolean(config.clientSecret), expectedAccount: config.account, connected: Boolean(connection?.secret), account: connection?.secret ? { code: connection.code, name: connection.name } : null, tests, events, payments: payments.map(payment => ({ ...payment, receipt: latestReceipt(payment.id) })), sync: syncStatus() };
+  return { enabled: config.enabled, mode: config.mode, autoConfirm: config.autoConfirm, oauthConfigured: /^\d+$/.test(config.clientId) && Boolean(config.clientSecret), expectedAccount: config.account, connected: Boolean(connection?.secret), account: connection?.secret ? { code: connection.code, name: connection.name } : null, tests, events, payments: payments.map(payment => ({ ...payment, receipt: latestReceipt(payment.id) })), sync: syncStatus() };
 }
 
 export function createPaymentTest(actorId: string, input: Record<string, unknown>) {
@@ -136,6 +137,16 @@ async function readPaymentAlerts() {
     }
     if (!batch.hasMore) break;
   }
+  if (donationConfig().autoConfirm) {
+    const reviews = getDb().select().from(paymentIntents).where(and(eq(paymentIntents.accountId, active.accountId), eq(paymentIntents.status, "review"))).limit(50).all();
+    for (const review of reviews) getDb().transaction(tx => {
+      const invoice = tx.select().from(paymentIntents).where(eq(paymentIntents.id, review.id)).get();
+      if (!invoice || invoice.status !== "review") return;
+      const receipt = tx.select().from(paymentReceipts).where(and(eq(paymentReceipts.intentId, invoice.id), eq(paymentReceipts.result, "matched"), eq(paymentReceipts.amount, invoice.amount), eq(paymentReceipts.currency, invoice.currency))).get();
+      const order = tx.select().from(orders).where(eq(orders.id, invoice.orderId)).get();
+      if (order && receipt && confirmOrderPayment(tx, order, { invoice, receiptId: receipt.id, actorId: order.userId, automatic: true, origin: publicOrigin(new Request("http://127.0.0.1:3000")), now: Date.now() })) results.confirmed = (results.confirmed || 0) + 1;
+    });
+  }
   return results;
 }
 
@@ -147,14 +158,14 @@ export function orderPaymentStatus(orderId: string) {
   const receipt = intent ? db.select({ id: paymentReceipts.id }).from(paymentReceipts).where(and(eq(paymentReceipts.intentId, intent.id), eq(paymentReceipts.result, "matched"))).get() : null;
   const latest = intent ? latestReceipt(intent.id) : null;
   const issue = latest && ["wrong_amount", "wrong_currency", "expired", "order_changed"].includes(latest.result) && intent?.status !== "review" && intent?.status !== "confirmed" ? latest : null;
-  return { available: config.mode === "orders" && Boolean(connection?.secret && config.account && connection.code?.toLowerCase() === config.account.toLowerCase()), intent: intent ? { ...intent, expired: intent.expiresAt <= Date.now() } : null, receipt: receipt ?? null, issue, sync: syncStatus() };
+  return { available: config.mode === "orders" && Boolean(connection?.secret && config.account && connection.code?.toLowerCase() === config.account.toLowerCase()), autoConfirm: config.autoConfirm, intent: intent ? { ...intent, expired: intent.expiresAt <= Date.now() } : null, receipt: receipt ?? null, issue, sync: syncStatus() };
 }
 
 export async function checkOrderPayment(orderId: string, userId: string) {
   const order = getDb().select().from(orders).where(and(eq(orders.id, orderId), eq(orders.userId, userId))).get();
   if (!order) throw new Error("Order not found");
   const payment = orderPaymentStatus(orderId);
-  if (order.paidAt || payment.intent?.status === "review") return { checked: false, retryAfter: 0, payment };
+  if (order.paidAt || (payment.intent?.status === "review" && !payment.autoConfirm)) return { checked: false, retryAfter: 0, payment };
   if (!payment.available) throw new Error("Connect the configured DonationAlerts account");
   if (!payment.intent) throw new Error("Prepare payment first");
   return null;
@@ -194,6 +205,7 @@ export function processOrderDonation(donation: Donation, accountId: string) {
     if (!order || order.updatedAt !== invoice.orderRevision || order.status !== "awaiting_payment" || order.paidAt || order.totalAmount !== invoice.amount || (order.quotedCurrency || "RUB") !== invoice.currency) result = "order_changed";
     tx.insert(paymentReceipts).values({ id: key, intentId: invoice.id, amount: donation.amount, currency: donation.currency, result, createdAt: now }).run();
     if (result === "matched") {
+      if (donationConfig().autoConfirm && confirmOrderPayment(tx, order!, { invoice, receiptId: key, actorId: order!.userId, automatic: true, origin: publicOrigin(new Request("http://127.0.0.1:3000")), now })) return "confirmed";
       tx.update(paymentIntents).set({ status: "review", matchedAt: now }).where(eq(paymentIntents.id, invoice.id)).run();
       enqueueOrderEvent(getDb().$client, { orderId: invoice.orderId, actorId: order!.userId, type: "payment_review", eventId: key, origin: publicOrigin(new Request("http://127.0.0.1:3000")) });
     }
