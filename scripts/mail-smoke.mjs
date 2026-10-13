@@ -53,6 +53,8 @@ try {
   const first = tokenFrom(letter(email));
   assert.equal(db.prepare("SELECT id FROM email_verifications WHERE email=?").get(email).id, hash(first));
   assert.match(letter(email).subject, /Complete your/);
+  assert.match(letter(email).html, /Confirm email/);
+  assert(letter(email).html.includes(`token=${first}`));
   await post("resend-verification", { email }, 429);
   await post("verify-email", { token: first, password }, 403, "https://evil.example");
   await post("verify-email", { token: first, password: "short" }, 400);

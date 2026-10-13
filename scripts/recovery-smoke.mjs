@@ -57,6 +57,7 @@ async function resetLink(user, lang = "ru") {
   work();
   const letter = letters().filter(letter => letter.to[0] === user.email && /Reset your|Восстановление/.test(letter.subject)).at(-1);
   assert(letter);
+  assert.match(letter.html, /Reset password|Восстановить пароль/);
   return tokenFrom(letter);
 }
 

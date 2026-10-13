@@ -64,6 +64,10 @@ test("order updates reach the opposite party once and respect verified addresses
   await processMailQueue(f.db, { now: Date.now() + 1, send: f.send });
   assert.equal(f.letters.length, 2);
   assert.match(f.letters.find(l => l.to === "client@example.test").subject, /Order terms accepted/);
+  const clientLetter = f.letters.find(l => l.to === "client@example.test");
+  assert.match(clientLetter.html, /View order/);
+  assert.match(clientLetter.html, /href="https:\/\/boost\.example\/orders\/order"/);
+  assert.match(clientLetter.html, /<html lang="en">/);
 });
 
 test("automatic payment confirmation notifies the client and verified admins once", async t => {
@@ -82,6 +86,8 @@ test("chat bursts wait five minutes and send one generic reminder", async t => {
   assert.equal((await processMailQueue(f.db, { now: f.now + 299999, send: f.send })).sent, 0);
   assert.equal((await processMailQueue(f.db, { now: f.now + 300000, send: f.send })).sent, 1);
   assert(!JSON.stringify(f.letters).includes("Private chat body"));
+  assert.match(f.letters[0].html, /Открыть переписку/);
+  assert.match(f.letters[0].html, /Текст переписки и данные аккаунта не включены/);
   f.message("admin", f.now + 400000);
   await processMailQueue(f.db, { now: f.now + 900000, send: f.send });
   assert.equal(f.letters.length, 1);
