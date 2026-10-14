@@ -1,4 +1,5 @@
 import { eq, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/sqlite-core";
 import { getDb } from "@/db";
 import { orders, promoEarnings, users } from "@/db/schema";
 import { promoCodes } from "@/lib/pricing.mjs";
@@ -21,6 +22,8 @@ export const GET = safeApi(async request => {
   const total = db.select({ count: sql<number>`count(*)` }).from(promoEarnings).get()!.count;
   const pages = Math.max(1, Math.ceil(total / 25));
   const page = Math.min(Number(raw), pages);
-  const earnings = db.select({ orderId: promoEarnings.orderId, promoCode: promoEarnings.promoCode, paidAmount: promoEarnings.paidAmount, amount: promoEarnings.amount, createdAt: promoEarnings.createdAt, reversedAt: promoEarnings.reversedAt, email: users.email }).from(promoEarnings).innerJoin(orders, eq(orders.id, promoEarnings.orderId)).innerJoin(users, eq(users.id, orders.userId)).orderBy(sql`${promoEarnings.createdAt} desc`, sql`${promoEarnings.orderId} desc`).limit(25).offset((page - 1) * 25).all();
-  return privateJson({ codes, earnings, page, pages, total });
+  const owners = alias(users, "promo_owners");
+  const earnings = db.select({ orderId: promoEarnings.orderId, promoCode: promoEarnings.promoCode, paidAmount: promoEarnings.paidAmount, amount: promoEarnings.amount, createdAt: promoEarnings.createdAt, reversedAt: promoEarnings.reversedAt, creditedAt: promoEarnings.creditedAt, email: users.email, ownerEmail: owners.email }).from(promoEarnings).innerJoin(orders, eq(orders.id, promoEarnings.orderId)).innerJoin(users, eq(users.id, orders.userId)).leftJoin(owners, eq(owners.id, promoEarnings.ownerId)).orderBy(sql`${promoEarnings.createdAt} desc`, sql`${promoEarnings.orderId} desc`).limit(25).offset((page - 1) * 25).all();
+  const personal = db.$client.prepare("SELECT (SELECT count(*) FROM personal_promos) AS codes, coalesce(sum(CASE WHEN credited_at IS NOT NULL AND reversed_at IS NULL THEN amount ELSE 0 END), 0) AS earned, coalesce(sum(CASE WHEN credited_at IS NULL AND reversed_at IS NULL THEN amount ELSE 0 END), 0) AS pending FROM promo_earnings WHERE owner_id IS NOT NULL").get();
+  return privateJson({ codes, earnings, personal, page, pages, total });
 });

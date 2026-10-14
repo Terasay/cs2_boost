@@ -5,8 +5,9 @@ export const ratingLimits: Record<"premier" | "faceit", { maxTarget: number; min
 export function validateRatings(platform: "premier" | "faceit", current: unknown, target: unknown): void;
 export function pricingErrorMessage(message: string, lang?: "ru" | "en"): string | undefined;
 export type PriceInput = { platform: "premier" | "faceit"; service: "rating" | "calibration"; current: number | null; target: number | null; redTrust?: boolean; promoCode?: string | null };
-export type Price = { pricingVersion: number; promoCode: string | null; redTrust: boolean; baseAmount: number | null; surchargeAmount: number; discountAmount: number; totalAmount: number | null; commissionAmount: number; durationDays: number | null; rate: number | null; unit: number | null };
-export function normalizePromo(value: unknown): string | null;
-export function discountedAmount(amount: number, promoCode: string | null): { discountAmount: number; totalAmount: number; commissionAmount: number };
-export function calculatePrice(input: PriceInput): Price;
+export type Promo = { code: string; discountPercent: number; commissionPercent: number };
+export type Price = { pricingVersion: number; promoCode: string | null; promoDiscountPercent: number; promoCommissionPercent: number; redTrust: boolean; baseAmount: number | null; surchargeAmount: number; discountAmount: number; totalAmount: number | null; commissionAmount: number; durationDays: number | null; rate: number | null; unit: number | null };
+export function normalizePromo(value: unknown, resolved?: Promo | null): string | null;
+export function discountedAmount(amount: number, promoCode: string | null, discountPercent?: number, commissionPercent?: number): { discountAmount: number; totalAmount: number; commissionAmount: number };
+export function calculatePrice(input: PriceInput, resolved?: Promo | null): Price;
 export function money(amount: number, lang?: "ru" | "en", currency?: string): string;

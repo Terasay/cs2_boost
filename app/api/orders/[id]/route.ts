@@ -1,6 +1,6 @@
 import { and, desc, eq, gt, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
-import { orderAccess, orderEvents, orderReviews, orders, paymentIntents, promoEarnings, users } from "@/db/schema";
+import { orderAccess, orderEvents, orderReviews, orders, paymentIntents, users } from "@/db/schema";
 import { getCurrentUser } from "../../auth/auth-lib";
 import { jsonInput, privateJson, safeApi, sameOriginMutation } from "../../request-security";
 import { readChatPage } from "../../chat-history";
@@ -8,6 +8,7 @@ import { dayMs, discountedAmount } from "@/lib/pricing.mjs";
 import { orderPaymentStatus } from "../../payments/donationalerts/service";
 import { enqueueOrderEvent } from "@/lib/notifications.mjs";
 import { publicOrigin } from "@/lib/server-config.mjs";
+import { creditReferral, reverseOrderWallet } from "@/lib/wallet.mjs";
 import { confirmOrderPayment } from "@/lib/confirm-order-payment";
 
 const fail = (error: string, status = 400) => privateJson({ error }, status);
@@ -51,7 +52,7 @@ async function PATCHHandler(request: Request) {
     let details: Record<string, unknown> = {};
     if (action === "accept" && !admin) {
       if (order.status !== "quoted" || order.proposalAmount === null || order.proposalDays === null) return fail("Order cannot be accepted", 409);
-      const price = discountedAmount(order.proposalAmount, order.promoCode);
+      const price = discountedAmount(order.proposalAmount, order.promoCode, order.promoDiscountPercent, order.promoCommissionPercent);
       Object.assign(changes, price, { durationDays: order.proposalDays, status: "awaiting_payment", acceptedAt: now, proposalAmount: null, proposalDays: null, proposalReason: null });
       details = { ...price, durationDays: order.proposalDays, reason: order.proposalReason };
     } else if (action === "accept" && admin) {
@@ -66,7 +67,7 @@ async function PATCHHandler(request: Request) {
       if (!Number.isInteger(input.days) || Number(input.days) < 1 || Number(input.days) > 1000) return fail("Invalid duration");
       if (reason.length < 3 || reason.length > 1000) return fail("Explain the change");
       Object.assign(changes, { status: "quoted", proposalAmount: input.amount, proposalDays: input.days, proposalReason: reason });
-      details = { amount: input.amount, days: input.days, reason, ...discountedAmount(Number(input.amount), order.promoCode) };
+      details = { amount: input.amount, days: input.days, reason, ...discountedAmount(Number(input.amount), order.promoCode, order.promoDiscountPercent, order.promoCommissionPercent) };
     } else if (action === "confirm_payment" && admin) {
       if (order.status !== "awaiting_payment" || order.paidAt || !order.totalAmount || !order.durationDays) return fail("Invalid order transition", 409);
       if (input.receivedAmount !== order.totalAmount || input.confirmed !== true) return fail("Confirm the exact payment amount");
@@ -100,12 +101,13 @@ async function PATCHHandler(request: Request) {
       if (!order.paidAt || order.status === "cancelled" || input.confirmed !== true) return fail("Invalid order transition", 409);
       if (reason.length < 3 || reason.length > 1000) return fail("Explain the change");
       changes.status = "cancelled";
-      tx.update(promoEarnings).set({ reversedAt: now }).where(eq(promoEarnings.orderId, id)).run();
+      reverseOrderWallet(db.$client, id, now);
       tx.delete(orderAccess).where(eq(orderAccess.orderId, id)).run();
       details = { reason, amount: order.totalAmount };
     } else return fail("Invalid order action");
     if (["propose", "cancel"].includes(String(action))) tx.update(paymentIntents).set({ status: "void" }).where(and(eq(paymentIntents.orderId, id), inArray(paymentIntents.status, ["pending", "review"]))).run();
     tx.update(orders).set(changes).where(eq(orders.id, id)).run();
+    if (action === "complete") creditReferral(db.$client, id, now);
     const eventId = crypto.randomUUID();
     tx.insert(orderEvents).values({ id: eventId, orderId: id, actorId: user.id, type: String(action), details: JSON.stringify(details), createdAt: now }).run();
     enqueueOrderEvent(db.$client, { orderId: id, actorId: user.id, type: String(action), eventId, origin: publicOrigin(request) });

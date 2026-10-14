@@ -53,3 +53,63 @@ test("large backlogs advance across refreshes without repeated or missing messag
   const merged = mergeChatPages(mergeChatPages(first.page, second.page), third.page);
   assert.deepEqual(merged.messages, rows);
 });
+
+const supportPage = (userId, threadId, messages) => ({ currentUserId: userId, thread: { id: threadId }, messages, nextCursor: null, latestCursor: messages.length ? cursor(messages.at(-1)) : null, hasMore: false });
+
+test("switching support accounts discards the previous user's messages and cursor", async () => {
+  const previous = supportPage("client-a", "thread-a", [message(100)]);
+  const fresh = { ...supportPage("client-b", "thread-b", [message(1)]), nextCursor: "new-history" };
+  const requested = [];
+  let cleared = false;
+  const result = await refreshChat("/api/support", previous.latestCursor, async url => {
+    requested.push(url);
+    if (url.includes("after=")) return supportPage("client-b", "thread-b", []);
+    assert.equal(cleared, true, "Old private data must be cleared before loading the new conversation");
+    return fresh;
+  }, { previousPage: previous, onConversationChange: () => { cleared = true; } });
+  assert.equal(requested.length, 2);
+  assert.equal(requested[1], "/api/support");
+  assert.equal(result.cursor, fresh.latestCursor);
+  assert.deepEqual(mergeChatPages(previous, result.page), fresh);
+});
+
+test("chat merging isolates both account and conversation identity", () => {
+  const previous = supportPage("client-a", "thread-a", [message(1)]);
+  for (const next of [supportPage("client-b", "thread-a", [message(2)]), supportPage("client-a", "thread-b", [message(2)])]) {
+    assert.deepEqual(mergeChatPages(previous, next), next);
+  }
+  const order = { currentUserId: "admin", order: { id: "order-a" }, messages: [message(1)], nextCursor: null };
+  const otherOrder = { ...order, order: { id: "order-b" }, messages: [message(2)] };
+  assert.deepEqual(mergeChatPages(order, otherOrder), otherOrder);
+});
+
+test("a session change between chat pages restarts without retaining either partial backlog", async () => {
+  const previous = supportPage("client-a", "thread-a", [message(0)]);
+  const fresh = supportPage("client-b", "thread-b", [message(3)]);
+  let calls = 0, resets = 0;
+  const result = await refreshChat("/api/support", previous.latestCursor, async url => {
+    calls++;
+    if (calls === 1) return { ...supportPage("client-a", "thread-a", [message(1)]), hasMore: true };
+    if (calls === 2) return { ...supportPage("client-b", "thread-b", [message(2)]), hasMore: true };
+    assert.equal(url, "/api/support");
+    return fresh;
+  }, { previousPage: previous, onConversationChange: () => { resets++; } });
+  assert.equal(resets, 1);
+  assert.equal(calls, 3);
+  assert.deepEqual(result.page, fresh);
+});
+
+test("old private data stays cleared when loading the changed conversation fails", async () => {
+  for (const status of [401, 403, 404, 503]) {
+    const previous = supportPage("client-a", "thread-a", [message(1)]);
+    let displayed = previous;
+    let calls = 0;
+    const failure = Object.assign(new Error("Request failed"), { status });
+    await assert.rejects(refreshChat("/api/support", previous.latestCursor, async () => {
+      if (++calls === 1) return supportPage("client-b", "thread-b", []);
+      assert.equal(displayed, null);
+      throw failure;
+    }, { previousPage: previous, onConversationChange: () => { displayed = null; } }), error => error === failure);
+    assert.equal(displayed, null);
+  }
+});

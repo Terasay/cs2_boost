@@ -1,7 +1,8 @@
 import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import { createHash, randomBytes } from "node:crypto";
 import { getDb } from "@/db";
-import { donationConnections, donationTestEvents, donationTests, orders, paymentIntents, paymentReceipts, serviceState } from "@/db/schema";
+import { donationConnections, donationTestEvents, donationTests, orders, paymentIntents, paymentReceipts, serviceState, walletTopups, walletReceipts } from "@/db/schema";
+import { changeWallet, walletBalance } from "@/lib/wallet.mjs";
 import { enqueueOrderEvent } from "@/lib/notifications.mjs";
 import { publicOrigin } from "@/lib/server-config.mjs";
 import { confirmOrderPayment } from "@/lib/confirm-order-payment";
@@ -41,7 +42,9 @@ export function paymentTestStatus() {
   const tests = db.select().from(donationTests).orderBy(desc(donationTests.createdAt)).limit(20).all();
   const events = db.select().from(donationTestEvents).orderBy(desc(donationTestEvents.createdAt)).limit(30).all();
   const payments = db.select().from(paymentIntents).orderBy(desc(sql`${paymentIntents.status} = 'review'`), desc(paymentIntents.createdAt)).limit(50).all();
-  return { enabled: config.enabled, mode: config.mode, autoConfirm: config.autoConfirm, oauthConfigured: /^\d+$/.test(config.clientId) && Boolean(config.clientSecret), expectedAccount: config.account, connected: Boolean(connection?.secret), account: connection?.secret ? { code: connection.code, name: connection.name } : null, tests, events, payments: payments.map(payment => ({ ...payment, receipt: latestReceipt(payment.id) })), sync: syncStatus() };
+  const topups = db.$client.prepare("SELECT t.id, t.reference, t.amount, t.currency, t.status, t.expires_at AS expiresAt, u.email, (SELECT result FROM wallet_receipts WHERE topup_id = t.id ORDER BY created_at DESC LIMIT 1) AS issue FROM wallet_topups t JOIN users u ON u.id = t.user_id ORDER BY t.created_at DESC LIMIT 50").all().map(row => ({ ...(row as Record<string, unknown>), expired: Number((row as {expiresAt:number}).expiresAt) <= Date.now() }));
+  const walletLiability = (db.$client.prepare("SELECT coalesce(sum(max(balance, 0)), 0) AS amount FROM wallet_accounts").get() as { amount: number }).amount;
+  return { enabled: config.enabled, mode: config.mode, autoConfirm: config.autoConfirm, oauthConfigured: /^\d+$/.test(config.clientId) && Boolean(config.clientSecret), expectedAccount: config.account, connected: Boolean(connection?.secret), account: connection?.secret ? { code: connection.code, name: connection.name } : null, tests, events, topups, walletLiability, payments: payments.map(payment => ({ ...payment, receipt: latestReceipt(payment.id) })), sync: syncStatus() };
 }
 
 export function createPaymentTest(actorId: string, input: Record<string, unknown>) {
@@ -132,7 +135,7 @@ async function readPaymentAlerts() {
     for (const raw of batch.donations) {
       const donation = normalizeDonation(raw);
       if (!donation) continue;
-      const result = donation.reference.startsWith("CS2PAY-") ? (donationConfig().mode === "orders" ? processOrderDonation(donation, active.accountId) : "unrelated") : processTestDonation(donation, "api", active.accountId);
+      const result = donation.reference.startsWith("CS2WAL-") ? (donationConfig().mode === "orders" ? processWalletDonation(donation, active.accountId) : "unrelated") : donation.reference.startsWith("CS2PAY-") ? (donationConfig().mode === "orders" ? processOrderDonation(donation, active.accountId) : "unrelated") : processTestDonation(donation, "api", active.accountId);
       if (result !== "unrelated") results[result] = (results[result] || 0) + 1;
     }
     if (!batch.hasMore) break;
@@ -153,12 +156,13 @@ async function readPaymentAlerts() {
 export function orderPaymentStatus(orderId: string) {
   const config = donationConfig();
   const db = getDb();
+  const buyer = db.select({ userId: orders.userId }).from(orders).where(eq(orders.id, orderId)).get();
   const connection = db.select().from(donationConnections).where(eq(donationConnections.id, connectionId)).get();
   const intent = db.select().from(paymentIntents).where(eq(paymentIntents.orderId, orderId)).orderBy(desc(paymentIntents.createdAt), desc(paymentIntents.id)).get();
   const receipt = intent ? db.select({ id: paymentReceipts.id }).from(paymentReceipts).where(and(eq(paymentReceipts.intentId, intent.id), eq(paymentReceipts.result, "matched"))).get() : null;
   const latest = intent ? latestReceipt(intent.id) : null;
   const issue = latest && ["wrong_amount", "wrong_currency", "expired", "order_changed"].includes(latest.result) && intent?.status !== "review" && intent?.status !== "confirmed" ? latest : null;
-  return { available: config.mode === "orders" && Boolean(connection?.secret && config.account && connection.code?.toLowerCase() === config.account.toLowerCase()), autoConfirm: config.autoConfirm, intent: intent ? { ...intent, expired: intent.expiresAt <= Date.now() } : null, receipt: receipt ?? null, issue, sync: syncStatus() };
+  return { walletBalance: buyer ? walletBalance(db.$client, buyer.userId) : 0, available: config.mode === "orders" && Boolean(connection?.secret && config.account && connection.code?.toLowerCase() === config.account.toLowerCase()), autoConfirm: config.autoConfirm, intent: intent ? { ...intent, expired: intent.expiresAt <= Date.now() } : null, receipt: receipt ?? null, issue, sync: syncStatus() };
 }
 
 export async function checkOrderPayment(orderId: string, userId: string) {
@@ -195,7 +199,7 @@ export function processOrderDonation(donation: Donation, accountId: string) {
   if (!donation.reference.startsWith("CS2PAY-")) return "unrelated";
   return getDb().transaction(tx => {
     const key = `donationalerts:${accountId}:${donation.id}`;
-    if (tx.select().from(paymentReceipts).where(eq(paymentReceipts.id, key)).get()) return "duplicate";
+    if (tx.select().from(paymentReceipts).where(eq(paymentReceipts.id, key)).get() || tx.select().from(walletReceipts).where(eq(walletReceipts.id, key)).get()) return "duplicate";
     const invoice = tx.select().from(paymentIntents).where(eq(paymentIntents.reference, donation.reference)).get();
     if (!invoice || invoice.accountId !== accountId) return "unrelated";
     const now = Date.now();
@@ -210,5 +214,49 @@ export function processOrderDonation(donation: Donation, accountId: string) {
       enqueueOrderEvent(getDb().$client, { orderId: invoice.orderId, actorId: order!.userId, type: "payment_review", eventId: key, origin: publicOrigin(new Request("http://127.0.0.1:3000")) });
     }
     return result;
+  });
+}
+
+export function walletPaymentStatus(userId: string) {
+  const db = getDb();
+  const config = donationConfig();
+  const connection = db.select().from(donationConnections).where(eq(donationConnections.id, connectionId)).get();
+  const topups = db.select().from(walletTopups).where(eq(walletTopups.userId, userId)).orderBy(desc(walletTopups.createdAt), desc(walletTopups.id)).limit(10).all();
+  return { available: config.mode === "orders" && Boolean(connection?.secret && config.account && connection.code?.toLowerCase() === config.account.toLowerCase()), topups: topups.map(row => ({ id: row.id, reference: row.reference, accountCode: row.accountCode, amount: row.amount, currency: row.currency, status: row.status, createdAt: row.createdAt, expiresAt: row.expiresAt, confirmedAt: row.confirmedAt, expired: row.expiresAt <= Date.now(), issue: db.select({ result: walletReceipts.result, amount: walletReceipts.amount, currency: walletReceipts.currency }).from(walletReceipts).where(eq(walletReceipts.topupId, row.id)).orderBy(desc(walletReceipts.createdAt)).get() ?? null })), sync: syncStatus() };
+}
+
+export function createWalletTopup(userId: string, amount: unknown) {
+  if (!Number.isSafeInteger(amount) || Number(amount) < 10000 || Number(amount) > 10000000) throw new Error("Top up between 100 and 100000 RUB");
+  const config = donationConfig();
+  if (config.mode !== "orders") throw new Error("Order payments are disabled");
+  return getDb().transaction(tx => {
+    const connection = tx.select().from(donationConnections).where(eq(donationConnections.id, connectionId)).get();
+    if (!connection?.secret || !connection.accountId || !connection.code || !config.account || connection.code.toLowerCase() !== config.account.toLowerCase()) throw new Error("Connect the configured DonationAlerts account");
+    const now = Date.now();
+    const previous = tx.select().from(walletTopups).where(and(eq(walletTopups.userId, userId), eq(walletTopups.status, "pending"))).orderBy(desc(walletTopups.createdAt)).get();
+    if (previous && previous.expiresAt > now) {
+      if (previous.amount !== amount) throw new Error("Finish the pending top up first");
+      return previous;
+    }
+    const topup = { id: crypto.randomUUID(), userId, reference: `CS2WAL-${randomBytes(16).toString("hex")}`, accountId: connection.accountId, accountCode: connection.code, amount: Number(amount), currency: "RUB", status: "pending", createdAt: now, expiresAt: now + 24 * 3600000 };
+    tx.insert(walletTopups).values(topup).run();
+    return topup;
+  });
+}
+
+export function processWalletDonation(donation: Donation, accountId: string) {
+  if (!donation.reference.startsWith("CS2WAL-")) return "unrelated";
+  return getDb().transaction(tx => {
+    const key = `donationalerts:${accountId}:${donation.id}`;
+    if (tx.select().from(walletReceipts).where(eq(walletReceipts.id, key)).get() || tx.select().from(paymentReceipts).where(eq(paymentReceipts.id, key)).get()) return "duplicate";
+    const topup = tx.select().from(walletTopups).where(eq(walletTopups.reference, donation.reference)).get();
+    if (!topup || topup.accountId !== accountId) return "unrelated";
+    const now = Date.now();
+    const result = topup.status !== "pending" ? "already_matched" : donationMatch(topup, donation, now);
+    tx.insert(walletReceipts).values({ id: key, topupId: topup.id, amount: donation.amount, currency: donation.currency, result, createdAt: now }).run();
+    if (result !== "matched") return result;
+    changeWallet(getDb().$client, { userId: topup.userId, reference: `topup:${topup.id}`, kind: "topup", amount: topup.amount, now });
+    tx.update(walletTopups).set({ status: "confirmed", confirmedAt: now }).where(eq(walletTopups.id, topup.id)).run();
+    return "wallet_confirmed";
   });
 }

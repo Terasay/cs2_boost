@@ -12,6 +12,7 @@ import "./order-actions.css";
 import "./recovery.css";
 import "./auth.css";
 import "./reviews.css";
+import "./wallet.css";
 
 export const metadata: Metadata = {
   title: "CS2 Boost — Premier & FACEIT",

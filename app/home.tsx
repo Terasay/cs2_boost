@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { readStorage, writeStorage } from "@/lib/browser-storage";
 import { calculatePrice, pricingErrorMessage, ratingLimits, type Price } from "@/lib/pricing.mjs";
+import { usePromo } from "./use-promo";
 import { PriceSummary, PromoInput } from "./price-summary";
 import { api, readDraft } from "./account-ui";
 import Image from "next/image";
@@ -31,7 +32,7 @@ const words = {
     continue:"Продолжить оформление",accountLater:"Аккаунт создаётся на следующем шаге",invalid:"Укажите текущий и желаемый рейтинг. Цель должна быть выше текущего.",
     serviceTitle:"Под ваш формат игры",s1:"Буст рейтинга",s1d:"Выберите Premier или FACEIT и укажите свой целевой рейтинг.",s2:"Калибровка",s2d:"Согласуем цель и условия перед началом матчей.",s3:"Два способа",s3d:"Играйте вместе с исполнителем или выберите выполнение на аккаунте.",
     processTitle:"Три шага до заказа",p1:"Задайте цель",p1d:"Выберите площадку, услугу и желаемый результат.",p2:"Согласуйте условия",p2d:"Администратор подтвердит цену и срок.",p3:"Следите за работой",p3d:"Статус заказа и чат доступны в личном кабинете.",
-    faqTitle:"Перед оформлением",q1:"Когда будет известна цена?",a1:"Для буста цена и срок видны в калькуляторе и сохраняются при оформлении. Тариф зависит от исходного рейтинга; красный траст в Premier добавляет 10%, промокод даёт скидку 20%. Условия калибровки согласуются отдельно.",q2:"Нужно ли создавать аккаунт сразу?",a2:"Нет. Сначала выберите параметры, затем создайте аккаунт для оформления заказа.",q3:"Можно ли играть вместе с исполнителем?",a3:"Да, выберите «Игра вместе» в форме заказа."
+    faqTitle:"Перед оформлением",q1:"Когда будет известна цена?",a1:"Для буста цена и срок видны в калькуляторе и сохраняются при оформлении. Тариф зависит от исходного рейтинга; красный траст в Premier добавляет 10%, личный промокод даёт скидку 5%, Cherep и Terasay — 20%. Условия калибровки согласуются отдельно.",q2:"Нужно ли создавать аккаунт сразу?",a2:"Нет. Сначала выберите параметры, затем создайте аккаунт для оформления заказа.",q3:"Можно ли играть вместе с исполнителем?",a3:"Да, выберите «Игра вместе» в форме заказа."
   },
   en: {
     services:"Services",process:"How it works",faq:"FAQ",login:"Sign in",eyebrow:"CS2 / PREMIER / FACEIT",
@@ -43,7 +44,7 @@ const words = {
     continue:"Continue to order",accountLater:"Create an account in the next step",invalid:"Enter your current and target rating. The target must be higher.",
     serviceTitle:"Your game, your format",s1:"Rating boost",s1d:"Choose Premier or FACEIT and set your target rating.",s2:"Calibration",s2d:"Agree on the goal and terms before matches start.",s3:"Two methods",s3d:"Play with the booster or arrange a piloted order.",
     processTitle:"Three steps to order",p1:"Set your goal",p1d:"Choose the platform, service and target.",p2:"Agree on terms",p2d:"An admin confirms the price and deadline.",p3:"Track progress",p3d:"Order status and chat are available in your account.",
-    faqTitle:"Before you order",q1:"When will I know the price?",a1:"For rating boosts, the calculator shows the price and duration before you submit. The rate depends on your starting rating; Premier red trust adds 10%, and a promo code takes 20% off. Calibration is agreed separately.",q2:"Do I need an account right away?",a2:"No. Configure your request first, then create an account to submit it.",q3:"Can I play with the booster?",a3:"Yes. Choose “Play together” in the order form."
+    faqTitle:"Before you order",q1:"When will I know the price?",a1:"For rating boosts, the calculator shows the price and duration before you submit. The rate depends on your starting rating; Premier red trust adds 10%, and personal codes take 5% off, and Cherep or Terasay takes 20% off. Calibration is agreed separately.",q2:"Do I need an account right away?",a2:"No. Configure your request first, then create an account to submit it.",q3:"Can I play with the booster?",a3:"Yes. Choose “Play together” in the order form."
   }
 };
 
@@ -55,6 +56,7 @@ export default function Home({ lang, reviews, initialPlatform = "premier", initi
   const [target,setTarget]=useState(initialPlatform === "faceit" ? "1500" : "10000");
   const [redTrust,setRedTrust]=useState(false);
   const [promoCode,setPromoCode]=useState("");
+  const promoLookup = usePromo(promoCode);
   const [error,setError]=useState("");
   const [signedIn,setSignedIn]=useState(false);
   useEffect(()=>{let active=true;void api<{user:unknown}>("/api/auth/me").then(result=>{if(active)setSignedIn(Boolean(result.user))}).catch(()=>{});return()=>{active=false}},[]);
@@ -75,7 +77,7 @@ export default function Home({ lang, reviews, initialPlatform = "premier", initi
   },[]);
   let price: Price | null = null;
   let priceProblem = "";
-  try { if(service === "calibration" || (current && target))price = calculatePrice({platform,service,current:Number(current),target:Number(target),redTrust:platform === "premier" && redTrust,promoCode}); }
+  try { if(service === "calibration" || (current && target))price = calculatePrice({platform,service,current:Number(current),target:Number(target),redTrust:platform === "premier" && redTrust,promoCode}, promoLookup.promo); }
   catch(reason) { priceProblem = reason instanceof Error ? pricingErrorMessage(reason.message, lang) ?? t.invalid : t.invalid; }
   useEffect(()=>{
     if(window.matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window))return;
@@ -141,9 +143,9 @@ export default function Home({ lang, reviews, initialPlatform = "premier", initi
             <p className="tariff-note">{platform === "premier" ? (lang === "ru" ? "Выше 10 000 на старте — 700 ₽ за 1 000 рейтинга." : "Starting above 10,000: 700 RUB per 1,000 rating.") : (lang === "ru" ? "Выше 1 200 ELO на старте — 700 ₽ за 100 ELO." : "Starting above 1,200: 700 RUB per 100 ELO.")} {lang === "ru" ? "Неполный шаг — пропорционально, срок округляется до дня." : "Partial steps are priced proportionally; time rounds up to a day."}</p></>}
           </div>
           <aside className="configuration-summary"><div className="summary-heading"><span>{lang === "ru" ? "ВАШ ЗАКАЗ" : "YOUR ORDER"}</span><span>03 / CONFIRM</span></div><div className="summary-mode"><strong>{platform.toUpperCase()}</strong><span>{service === "calibration" ? t.calibration : method.toUpperCase()}</span></div>
-            {service === "rating" ? <><div className="summary-route"><span>{current ? <AnimatedNumber value={Number(current)} ru={lang === "ru"}/> : "—"}</span><ArrowRight size={22}/><strong>{target ? <AnimatedNumber value={Number(target)} ru={lang === "ru"}/> : "—"}</strong></div><div className="summary-delta">{price?.durationDays ? `+${new Intl.NumberFormat(lang === "ru" ? "ru-RU" : "en-US").format(Number(target) - Number(current))} ${platform === "premier" ? (lang === "ru" ? "рейтинга" : "rating") : "ELO"}` : (lang === "ru" ? "Укажите корректную цель" : "Set a valid target")}</div></> : <div className="summary-calibration">UNRANKED<ArrowUpRight size={22}/></div>}
-            <PriceSummary price={price} ru={lang === "ru"} problem={priceProblem}/>
-            <PromoInput value={promoCode} onChange={value=>{setPromoCode(value);writeStorage("sessionStorage","cs2-promo",value)}} ru={lang === "ru"}/>
+            {service === "rating" ? <><div className="summary-route"><span>{current ? <AnimatedNumber value={Number(current)} ru={lang === "ru"}/> : "—"}</span><ArrowRight size={22}/><strong>{target ? <AnimatedNumber value={Number(target)} ru={lang === "ru"}/> : "—"}</strong></div><div className="summary-delta">{Number(target) > Number(current) ? `+${new Intl.NumberFormat(lang === "ru" ? "ru-RU" : "en-US").format(Number(target) - Number(current))} ${platform === "premier" ? (lang === "ru" ? "рейтинга" : "rating") : "ELO"}` : (lang === "ru" ? "Укажите корректную цель" : "Set a valid target")}</div></> : <div className="summary-calibration">UNRANKED<ArrowUpRight size={22}/></div>}
+            <PriceSummary pending={promoLookup.checking} price={price} ru={lang === "ru"} problem={priceProblem}/>
+            <PromoInput lookup={promoLookup} value={promoCode} onChange={value=>{setPromoCode(value);writeStorage("sessionStorage","cs2-promo",value)}} ru={lang === "ru"}/>
             {error&&<p className="error" role="alert">{error}</p>}
             <Button className="continue-button tactical-primary" onClick={next} disabled={!price}>{t.continue}<ArrowUpRight size={19}/></Button><p className="under-button">{signedIn?(lang==="ru"?"Заказ сохранится в вашем кабинете":"Saved to your account"):t.accountLater}</p><div className="summary-assurance"><ShieldCheck size={14}/>{lang === "ru" ? "Оплата после принятия заявки" : "Pay after your request is accepted"}</div>
           </aside>

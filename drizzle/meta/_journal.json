@@ -92,6 +92,13 @@
       "when": 1791906701192,
       "tag": "0012_order_reviews",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1791996226300,
+      "tag": "0013_wallet_and_personal_promos",
+      "breakpoints": true
     }
   ]
 }

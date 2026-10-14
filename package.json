@@ -20,6 +20,7 @@
     "test:donationalerts": "node --test scripts/donationalerts.test.mjs",
     "test:donationalerts:smoke": "node scripts/donationalerts-smoke.mjs",
     "test:payments": "node scripts/order-payments-smoke.mjs",
+    "test:wallet": "node --test scripts/wallet.test.mjs && node scripts/wallet-smoke.mjs",
     "test:orders": "node scripts/order-smoke.mjs",
     "test:mail": "node --test scripts/mail.test.mjs",
     "test:notifications": "node --test scripts/notifications.test.mjs",

@@ -76,7 +76,7 @@ export default function OrderWorkspace({ id, embedded = false, onActivity }: { i
         {order.baseAmount !== null && <div><dt>{ru ? "Базовая стоимость" : "Base price"}</dt><dd>{money(order.baseAmount,lang,currency)}</dd></div>}
         {order.redTrust && <div><dt>{ru ? "Красный траст · +10%" : "Red trust · +10%"}</dt><dd>{money(order.surchargeAmount,lang,currency)}</dd></div>}
         {order.baseAmount !== null && total !== null && total + order.discountAmount !== order.baseAmount + order.surchargeAmount && <div><dt>{ru ? "Согласованная поправка" : "Agreed adjustment"}</dt><dd>{money(total + order.discountAmount - order.baseAmount - order.surchargeAmount,lang,currency)}</dd></div>}
-        {order.promoCode && <div className="price-discount"><dt>{order.promoCode} · −20%</dt><dd>−{money(order.discountAmount,lang,currency)}</dd></div>}
+        {order.promoCode && <div className="price-discount"><dt>{order.promoCode} · −{order.promoDiscountPercent}%</dt><dd>−{money(order.discountAmount,lang,currency)}</dd></div>}
         <div className="order-total"><dt>{ru ? "Итого" : "Total"}</dt><dd>{total === null ? (ru ? "На согласовании" : "Pending agreement") : money(total,lang,currency)}</dd></div>
         <div><dt>{ru ? "Дней на выполнение" : "Delivery days"}</dt><dd>{order.durationDays ?? "—"}</dd></div>
         {!order.pricingVersion && order.deadline && <div><dt>{ru ? "Прежний срок" : "Previous deadline"}</dt><dd>{order.deadline}</dd></div>}

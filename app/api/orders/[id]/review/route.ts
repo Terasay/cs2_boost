@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { orderReviews, orders } from "@/db/schema";
+import { claimPersonalPromo } from "@/lib/wallet.mjs";
 import { getCurrentUser } from "../../../auth/auth-lib";
 import { chargeAttempt, rateKey } from "../../../auth/rate-limit";
 import { jsonInput, privateJson, safeApi, sameOriginMutation } from "../../../request-security";
@@ -28,7 +29,8 @@ export const POST = safeApi(async request => {
     const now = Math.max(Date.now(), (existing?.updatedAt ?? 0) + 1);
     const review = { id: existing?.id ?? crypto.randomUUID(), orderId: id, authorName, body, rating: Number(input.rating), published: existing?.published ?? true, createdAt: existing?.createdAt ?? now, updatedAt: now };
     tx.insert(orderReviews).values(review).onConflictDoUpdate({ target: orderReviews.orderId, set: { authorName, body, rating: review.rating, updatedAt: now } }).run();
-    return privateJson({ review }, existing ? 200 : 201);
+    const promoCode = order.paidAt ? claimPersonalPromo(getDb().$client, user.id) : null;
+    return privateJson({ review, promoCode }, existing ? 200 : 201);
   });
 });
 

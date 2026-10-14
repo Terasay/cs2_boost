@@ -37,6 +37,13 @@ export class ApiError extends Error {
 }
 
 const errorMessages: Record<string, string> = {
+  "Insufficient balance": "На балансе недостаточно средств. Пополните его или оплатите заказ отдельно.",
+  "Complete a paid order and leave a review first": "Сначала завершите оплаченный заказ и оставьте отзыв.",
+  "Top up between 100 and 100000 RUB": "Сумма пополнения — от 100 до 100 000 рублей.",
+  "Finish the pending top up first": "Сначала завершите или отмените текущий счёт на пополнение.",
+  "Top up not found": "Счёт на пополнение не найден.",
+  "Top up cannot be cancelled": "Счёт уже оплачен или по нему найден перевод. Напишите в поддержку.",
+  "Confirm no external payment was sent": "Подтвердите, что ещё не отправляли перевод через DonationAlerts.",
   "Only the order owner can review": "Отзыв может оставить только клиент этого заказа.",
   "Enter a rating, public nickname and 10–1500 character review": "Выберите оценку, укажите ник от 2 до 40 символов без email и текст от 10 до 1 500 символов.",
   "Review available after order completion": "Оставить отзыв можно после завершения заказа.",

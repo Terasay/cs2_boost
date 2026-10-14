@@ -11,7 +11,7 @@ export function useLiveResource<T>(endpoint: string, interval = 5000, chat = fal
   const [loading, setLoading] = useState(false);
   const sequence = useRef(0);
   const controller = useRef<AbortController | null>(null);
-  const latest = useRef<{ key: string; cursor: string } | null>(null);
+  const latest = useRef<{ key: string; cursor: string; page: ChatPage } | null>(null);
   const reload = useCallback(async () => {
     const request = ++sequence.current;
     controller.current?.abort();
@@ -20,10 +20,18 @@ export function useLiveResource<T>(endpoint: string, interval = 5000, chat = fal
     setLoading(true);
     try {
       const signal = AbortSignal.any([abort.signal, AbortSignal.timeout(15000)]);
-      const sync = chat ? await refreshChat(endpoint, latest.current?.key === endpoint ? latest.current.cursor : null, url => api<T & ChatPage>(markRead ? url : `${url}${url.includes("?") ? "&" : "?"}read=0`, { signal })) : null;
+      const previous = latest.current?.key === endpoint ? latest.current : null;
+      const sync = chat ? await refreshChat(endpoint, previous?.cursor ?? null, url => api<T & ChatPage>(markRead ? url : `${url}${url.includes("?") ? "&" : "?"}read=0`, { signal }), {
+        previousPage: previous?.page,
+        onConversationChange: () => {
+          if (request !== sequence.current || abort.signal.aborted) return;
+          setStored(null);
+          latest.current = null;
+        },
+      }) : null;
       const result = sync ? sync.page : await api<T>(endpoint, { signal });
       if (request !== sequence.current || abort.signal.aborted) return;
-      if (sync) latest.current = { key: endpoint, cursor: sync.cursor };
+      if (sync) latest.current = { key: endpoint, cursor: sync.cursor, page: sync.page };
       setStored(previous => {
         if (!chat || previous?.key !== endpoint) return { key: endpoint, value: result };
         const prior = previous.value as T & ChatPage;

@@ -20,7 +20,7 @@ export type Order = {
   updatedAt: number;
   pricingVersion: number;
   redTrust: boolean;
-  promoCode: string | null;
+  promoCode: string | null; promoDiscountPercent: number; promoCommissionPercent: number;
   baseAmount: number | null;
   surchargeAmount: number;
   discountAmount: number;
@@ -31,6 +31,7 @@ export type Order = {
   standardDays: number | null;
   acceptedAt: number | null;
   paidAt: number | null;
+  paymentMethod: string | null;
   startedAt: number | null;
   dueAt: number | null;
   completedAt: number | null;
@@ -181,7 +182,7 @@ export function OrderActions({
   const proposal =
     order.proposalAmount === null
       ? null
-      : discountedAmount(order.proposalAmount, order.promoCode);
+      : discountedAmount(order.proposalAmount, order.promoCode, order.promoDiscountPercent, order.promoCommissionPercent);
   const labels = mode ? actionLabels[mode][lang] : null;
   const requiresConfirmation = mode === "refund" || mode === "complete";
   function open(value: OrderAction) {
@@ -247,7 +248,7 @@ export function OrderActions({
           </dl>
           {order.promoCode && (
             <small>
-              {order.promoCode}: −20% {ru ? "уже учтены" : "included"}
+              {order.promoCode}: −{order.promoDiscountPercent}% {ru ? "уже учтены" : "included"}
             </small>
           )}
           {!admin && (
@@ -440,8 +441,8 @@ export function OrderActions({
               <span>
                 {mode === "refund"
                   ? ru
-                    ? "Полная сумма уже возвращена клиенту вне сайта"
-                    : "The full amount was refunded outside the site"
+                    ? order.paymentMethod === "wallet" ? "Вернуть полную сумму на баланс клиента" : "Полная сумма уже возвращена клиенту вне сайта"
+                    : order.paymentMethod === "wallet" ? "Return the full amount to the client’s balance" : "The full amount was refunded outside the site"
                   : ru
                     ? "Согласованный результат достигнут"
                     : "The agreed result has been delivered"}

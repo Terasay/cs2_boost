@@ -5,7 +5,8 @@ import { emailVerifications, notificationPreferences, users } from "@/db/schema"
 import { reserveMailSlot } from "@/lib/notifications.mjs";
 import { cleanAttribution } from "@/lib/attribution.mjs";
 import { ratingValue } from "@/lib/order-validation";
-import { normalizePromo, validateRatings } from "@/lib/pricing.mjs";
+import { resolvePromo } from "@/lib/wallet.mjs";
+import { validateRatings } from "@/lib/pricing.mjs";
 import { publicOrigin } from "@/lib/server-config.mjs";
 import { mailConfig, sendEmail, verificationLetter } from "@/lib/mail.mjs";
 import { jsonInput, privateJson } from "../request-security";
@@ -25,7 +26,7 @@ function registrationDraft(input: unknown) {
     try { validateRatings(draft.platform, current, target); } catch { return null; }
   }
   let promoCode: string | null;
-  try { promoCode = normalizePromo(draft.promoCode); } catch { return null; }
+  try { promoCode = resolvePromo(getDb().$client, draft.promoCode)?.code ?? null; } catch { return null; }
   return { platform: draft.platform, service: draft.service, method: draft.method, current, target, redTrust: draft.platform === "premier" && draft.redTrust === true, promoCode };
 }
 

@@ -118,6 +118,10 @@ export const orders = sqliteTable("orders", {
   pricingVersion: integer("pricing_version").notNull().default(0),
   redTrust: integer("red_trust", { mode: "boolean" }).notNull().default(false),
   promoCode: text("promo_code"),
+  promoOwnerId: text("promo_owner_id").references(() => users.id),
+  promoDiscountPercent: integer("promo_discount_percent").notNull().default(20),
+  promoCommissionPercent: integer("promo_commission_percent").notNull().default(20),
+  paymentMethod: text("payment_method"),
   baseAmount: integer("base_amount"),
   surchargeAmount: integer("surcharge_amount").notNull().default(0),
   discountAmount: integer("discount_amount").notNull().default(0),
@@ -170,7 +174,53 @@ export const promoEarnings = sqliteTable("promo_earnings", {
   amount: integer("amount").notNull(),
   createdAt: integer("created_at").notNull(),
   reversedAt: integer("reversed_at"),
-}, table => [index("promo_earnings_code_idx").on(table.promoCode, table.createdAt)]);
+  ownerId: text("owner_id").references(() => users.id),
+  creditedAt: integer("credited_at"),
+}, table => [index("promo_earnings_code_idx").on(table.promoCode, table.createdAt), index("promo_earnings_owner_idx").on(table.ownerId, table.createdAt)]);
+
+export const personalPromos = sqliteTable("personal_promos", {
+  userId: text("user_id").primaryKey().references(() => users.id),
+  code: text("code").notNull().unique(),
+  createdAt: integer("created_at").notNull(),
+});
+
+export const walletAccounts = sqliteTable("wallet_accounts", {
+  userId: text("user_id").primaryKey().references(() => users.id),
+  balance: integer("balance").notNull().default(0),
+});
+
+export const walletEntries = sqliteTable("wallet_entries", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  reference: text("reference").notNull().unique(),
+  kind: text("kind").notNull(),
+  amount: integer("amount").notNull(),
+  orderId: text("order_id").references(() => orders.id),
+  createdAt: integer("created_at").notNull(),
+}, table => [index("wallet_entries_user_idx").on(table.userId, table.createdAt, table.id)]);
+
+export const walletTopups = sqliteTable("wallet_topups", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  reference: text("reference").notNull().unique(),
+  accountId: text("account_id").notNull(),
+  accountCode: text("account_code").notNull(),
+  amount: integer("amount").notNull(),
+  currency: text("currency").notNull().default("RUB"),
+  status: text("status").notNull().default("pending"),
+  createdAt: integer("created_at").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+  confirmedAt: integer("confirmed_at"),
+}, table => [index("wallet_topups_user_idx").on(table.userId, table.createdAt)]);
+
+export const walletReceipts = sqliteTable("wallet_receipts", {
+  id: text("id").primaryKey(),
+  topupId: text("topup_id").notNull().references(() => walletTopups.id),
+  amount: integer("amount").notNull(),
+  currency: text("currency").notNull(),
+  result: text("result").notNull(),
+  createdAt: integer("created_at").notNull(),
+}, table => [index("wallet_receipts_topup_idx").on(table.topupId, table.createdAt)]);
 
 export const orderAccess = sqliteTable("order_access", {
   orderId: text("order_id").primaryKey().references(() => orders.id, { onDelete: "cascade" }),

@@ -4,6 +4,7 @@ import { useId, useRef, useState, type FormEvent } from "react";
 import { BadgeCheck, Pencil, Star } from "lucide-react";
 import { api } from "./account-ui";
 import { ReviewCard } from "./review-cards";
+import { PersonalPromoPanel } from "./personal-promo";
 import type { OrderReview } from "@/lib/reviews";
 import type { Order } from "./order-controls";
 
@@ -50,5 +51,6 @@ export function OrderReviewPanel({ id, order, review, admin, ru, onSaved }: { id
       <small>{body.length} / 1500 · {ru ? "Отзыв публикуется на сайте. Не указывайте пароли, контакты и платёжные данные." : "Your review is published on the website. Do not include passwords, contact or payment details."}</small>
       <div className="review-form-actions"><button className="compact-primary" type="submit" disabled={busy || authorName.trim().length < 2 || body.trim().length < 10}>{busy ? (ru ? "Сохраняем…" : "Saving…") : review ? (ru ? "Сохранить отзыв" : "Save review") : (ru ? "Опубликовать отзыв" : "Publish review")}</button>{review && <button className="secondary-action" type="button" disabled={busy} onClick={() => setEditing(false)}>{ru ? "Отмена" : "Cancel"}</button>}</div>
     </form>}
+    {review && !admin && <PersonalPromoPanel ru={ru}/>}
   </section>;
 }

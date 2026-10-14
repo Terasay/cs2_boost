@@ -1,13 +1,14 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, Copy, ExternalLink, RefreshCw } from "lucide-react";
+import { AlertCircle, CheckCircle2, Copy, ExternalLink, RefreshCw, Wallet } from "lucide-react";
 import { api } from "./account-ui";
 import type { Order } from "./order-controls";
 import { money } from "@/lib/pricing.mjs";
 
 type Intent = { id: string; reference: string; accountCode: string; status: string; amount: number; currency: string; expiresAt: number; expired: boolean };
 export type PaymentInfo = {
+  walletBalance: number;
   available: boolean;
   autoConfirm: boolean;
   intent: Intent | null;
@@ -25,6 +26,7 @@ export function OrderPayment({ order, payment, admin, ru, busy, run, reload }: {
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
   const [reason, setReason] = useState("");
+  const [noTransfer, setNoTransfer] = useState(false);
   const pending = useRef(false);
   if (order.status !== "awaiting_payment") return null;
   const t = (ruText: string, enText: string) => ru ? ruText : enText;
@@ -35,6 +37,16 @@ export function OrderPayment({ order, payment, admin, ru, busy, run, reload }: {
   const locale = ru ? "ru" : "en";
   const issue = payment.issue;
   const endpoint = "/api/orders/" + order.id + "/payment";
+
+  async function payFromBalance() {
+    if (pending.current) return;
+    pending.current = true; setWorking(true); setError(""); setFeedback("");
+    try {
+      await api(endpoint, { method: "POST", signal: AbortSignal.timeout(15000), body: JSON.stringify({ action: "wallet", updatedAt: order.updatedAt, noExternalPayment: noTransfer }) });
+      reload();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Error"); reload(); }
+    finally { pending.current = false; setWorking(false); }
+  }
 
   async function checkout() {
     if (pending.current) return;
@@ -73,6 +85,7 @@ export function OrderPayment({ order, payment, admin, ru, busy, run, reload }: {
     <div className="payment-amount"><span>{t("Сумма заказа", "Order amount")}</span><strong>{total === null ? "—" : money(total, locale, currency)}</strong></div>
     {error && <p className="error" role="alert">{error}</p>}
     {feedback && <p className="saved-feedback" role="status">{feedback}</p>}
+    {!admin && currency === "RUB" && total !== null && <div className="order-wallet-payment"><div><Wallet size={20}/><span>{t("На вашем балансе", "Your balance")}<strong>{money(payment.walletBalance, locale)}</strong></span></div>{payment.walletBalance >= total ? <>{invoice?.status === "pending" && !issue && <label className="trust-check"><input type="checkbox" checked={noTransfer} onChange={event => setNoTransfer(event.target.checked)}/><span>{t("Я ещё не отправлял перевод через DonationAlerts. Оплатить с баланса.", "I have not sent a DonationAlerts transfer. Pay from my balance.")}</span></label>}<button type="button" className="compact-primary" disabled={working || busy || reviewing || Boolean(issue) || (invoice?.status === "pending" && !noTransfer)} onClick={payFromBalance}>{working ? t("Оплачиваем…", "Paying…") : t(`Оплатить с баланса · ${money(total, locale)}`, `Pay from balance · ${money(total, locale)}`)}</button><small>{t("Сумма спишется сразу, после чего откроется форма игровых данных.", "The amount is debited immediately and the game details form opens.")}</small></> : <><p>{t("Можно пополнить баланс или оплатить этот заказ отдельно ниже.", "Top up your balance or pay for this order separately below.")}</p><a className="secondary-action" href="/wallet">{t("Пополнить баланс", "Top up balance")}<ExternalLink size={14}/></a></>}</div>}
     {issue && !reviewing && <div className="payment-issue" role="status"><AlertCircle size={18}/><div>
       <strong>{issue.result === "wrong_currency" ? t("Валюта перевода отличается", "Transfer currency differs") : issue.result === "wrong_amount" ? t("Сумма перевода отличается", "Transfer amount differs") : t("Нужна проверка администратора", "Admin verification needed")}</strong>
       <p>{t("DonationAlerts сообщил:", "DonationAlerts reported:")} <b>{money(issue.amount, locale, issue.currency)}</b>. {t("В заказе:", "Order:")} <b>{total === null ? "—" : money(total, locale, currency)}</b>.</p>
