@@ -12,6 +12,7 @@
 /coverage
 
 /.next/
+/.update-previous/
 /out/
 
 .DS_Store

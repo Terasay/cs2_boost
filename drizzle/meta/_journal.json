@@ -99,6 +99,13 @@
       "when": 1791996226300,
       "tag": "0013_wallet_and_personal_promos",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1793016963073,
+      "tag": "0014_registration_mail_queue",
+      "breakpoints": true
     }
   ]
 }

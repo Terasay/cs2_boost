@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 if [[ $EUID -ne 0 ]]; then
     echo "Run with sudo bash deploy/update-ubuntu.sh"
@@ -19,6 +19,16 @@ for option in "$@"; do
         *) echo "Unknown option: $option"; exit 1 ;;
     esac
 done
+exec 9>/var/lock/cs2-boost-update.lock
+if ! flock -n 9; then
+    echo "Another update is already running. Wait for it to finish."
+    exit 1
+fi
+previous_dir="$repo_dir/.update-previous"
+if [[ -e "$previous_dir" || -L "$previous_dir" ]]; then
+    echo "A previous update needs attention: $previous_dir. Keep these recovery files until the failed update is investigated."
+    exit 1
+fi
 node_bin=/opt/node24/bin/node
 "$node_bin" "$repo_dir/scripts/ensure-access-key.mjs" /etc/cs2-boost.env
 source /etc/cs2-boost.env
@@ -42,26 +52,77 @@ else
     as_app env NODE_OPTIONS=--max-old-space-size=384 npm ci --dry-run --include=dev --ignore-scripts --prefer-offline --no-audit --no-fund
 fi
 as_app node scripts/backup.mjs
-if systemctl cat cs2-boost-mail.timer >/dev/null 2>&1; then
-    systemctl stop cs2-boost-mail.timer cs2-boost-mail.service
-fi
+had_build=0
+[[ ! -f .next/BUILD_ID ]] || had_build=1
+active_timers=()
+phase=preparing
+recover_update() {
+    local status=$?
+    trap - ERR INT TERM
+    set +e
+    if [[ "$phase" == preparing || "$phase" == building ]]; then
+        local restored=1
+        if [[ -d "$previous_dir/.next" && -d "$repo_dir/.next/cache" && ! -e "$previous_dir/.next/cache" ]]; then
+            mv -- "$repo_dir/.next/cache" "$previous_dir/.next/cache" || restored=0
+        fi
+        for item in .next node_modules; do
+            if [[ -d "$previous_dir/$item" ]]; then
+                rm -rf -- "$repo_dir/$item" && mv -- "$previous_dir/$item" "$repo_dir/$item" || restored=0
+            fi
+        done
+        if [[ "$restored" -eq 1 ]]; then
+            rmdir -- "$previous_dir" 2>/dev/null
+            if [[ "$had_build" -eq 1 ]] && systemctl start cs2-boost && curl --silent --show-error --fail --max-time 5 --retry 10 --retry-connrefused --retry-delay 2 http://127.0.0.1:3000/api/health; then
+                for timer in "${active_timers[@]}"; do systemctl start "$timer"; done
+                printf '\n%s\n' 'Update failed; the previous build and dependencies were restored. The database was not migrated.'
+            else
+                echo "Update failed. Previous files were restored, but the website could not be verified. Inspect journalctl -u cs2-boost."
+            fi
+        else
+            echo "File recovery failed. Preserve $previous_dir and inspect the filesystem before retrying."
+        fi
+    else
+        systemctl stop cs2-boost
+        echo "Update failed during migration or startup. The database was not rolled back. Previous application files remain in $previous_dir; a verified database backup is available in $BACKUP_DIR."
+    fi
+    exit "${status:-1}"
+}
+trap recover_update ERR
+trap 'false' INT TERM
+mkdir -m 700 -- "$previous_dir"
+for worker in mail payments backup; do
+    if systemctl cat "cs2-boost-$worker.timer" >/dev/null 2>&1; then
+        if systemctl is-active --quiet "cs2-boost-$worker.timer"; then active_timers+=("cs2-boost-$worker.timer"); fi
+        systemctl stop "cs2-boost-$worker.timer" "cs2-boost-$worker.service"
+    fi
+done
 systemctl stop cs2-boost
-trap 'echo "Update failed after the service was stopped. The database backup is available. Fix the reported error and rerun this script."' ERR
+phase=building
+if [[ -d .next ]]; then mv -- .next "$previous_dir/.next"; fi
+as_app mkdir -p .next
+if [[ -d "$previous_dir/.next/cache" ]]; then mv -- "$previous_dir/.next/cache" .next/cache; fi
 if [[ "$install_dependencies" -eq 1 ]]; then
+    if [[ -d node_modules ]]; then mv -- node_modules "$previous_dir/node_modules"; fi
     as_app env NODE_OPTIONS=--max-old-space-size=384 npm ci --include=dev --ignore-scripts --prefer-offline --no-audit --no-fund
     as_app node scripts/dependencies-ready.mjs
     printf '%s\n' "$fingerprint" | runuser -u cs2boost -- tee "$marker" >/dev/null
 fi
 as_app env NODE_OPTIONS=--max-old-space-size=512 npm run build
 install -d -m 700 -o cs2boost -g cs2boost /opt/cs2-boost/.next/cache
+phase=migrating
 as_app env NODE_ENV=production node --env-file=/etc/cs2-boost.env scripts/migrate.mjs
 as_app env NODE_ENV=production node --env-file=/etc/cs2-boost.env scripts/check-config.mjs
 systemctl start cs2-boost
 install -m 644 deploy/cs2-boost-payments.service deploy/cs2-boost-payments.timer deploy/cs2-boost-mail.service deploy/cs2-boost-mail.timer /etc/systemd/system/
 systemctl daemon-reload
+curl --fail --max-time 5 --retry 10 --retry-connrefused --retry-delay 2 http://127.0.0.1:3000/api/health
+trap - ERR INT TERM
+rm -rf -- "$previous_dir"
 systemctl enable --now cs2-boost-payments.timer
 systemctl enable --now cs2-boost-mail.timer
-curl --fail --retry 10 --retry-connrefused --retry-delay 2 http://127.0.0.1:3000/api/health
+for timer in "${active_timers[@]}"; do
+    if [[ "$timer" == cs2-boost-backup.timer ]]; then systemctl start "$timer"; fi
+done
 if [[ "$clean_cache" -eq 1 ]]; then
     as_app npm cache clean --force
 fi

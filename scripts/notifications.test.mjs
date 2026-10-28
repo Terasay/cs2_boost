@@ -6,7 +6,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { resolve } from "node:path";
 import { openAccess } from "../lib/order-access.mjs";
-import { enqueueEmail, enqueueOrderEvent, enqueueChatReminder, markChatRead, processMailQueue, reserveMailSlot } from "../lib/notifications.mjs";
+import { enqueueEmail, enqueueRegistrationEmail, enqueueOrderEvent, enqueueChatReminder, markChatRead, processMailQueue, reserveMailSlot } from "../lib/notifications.mjs";
 
 process.env.ORDER_ACCESS_KEY = randomBytes(32).toString("hex");
 process.env.RESEND_API_KEY = "re_local_test_only";
@@ -49,6 +49,38 @@ test("queued content is encrypted, bound to its ID, and cleared after delivery",
   assert.equal((await processMailQueue(f.db, { now: f.now, send: f.send })).sent, 1);
   assert.equal(f.db.prepare("SELECT payload FROM mail_outbox").get().payload, null);
   assert.match(f.letters[0].idempotencyKey, /^mail-[0-9a-f]{64}$/);
+});
+
+test("registration delivery survives a failed attempt and uses a live token without an account", async t => {
+  const f = fixture(t);
+  const tokenId = hash("registration-token");
+  f.db.prepare("INSERT INTO email_verifications(id,email,created_at,expires_at) VALUES(?,?,?,?)").run(tokenId, "new@example.test", f.now, f.now + 1800000);
+  const jobId = enqueueRegistrationEmail(f.db, { tokenId, now: f.now, letter: { subject: "Confirm", text: "private-link" } });
+  f.job("unrelated");
+  await processMailQueue(f.db, { now: f.now, jobId, send: async () => { throw Object.assign(new Error("unavailable"), { status: 503 }); } });
+  const pending = f.db.prepare("SELECT * FROM mail_outbox WHERE id = ?").get(jobId);
+  assert.equal(pending.user_id, null);
+  assert.equal(pending.status, "pending");
+  assert(!pending.payload.includes("private-link"));
+  assert.equal(pending.next_attempt_at, f.now + 60000);
+  await processMailQueue(f.db, { now: f.now + 60000, jobId, send: f.send });
+  assert.equal(f.letters.length, 1);
+  assert.equal(f.letters[0].to, "new@example.test");
+  assert.equal(f.db.prepare("SELECT status FROM mail_outbox WHERE id = ?").get(hash("unrelated")).status, "pending");
+  assert.equal(f.db.prepare("SELECT payload FROM mail_outbox WHERE id = ?").get(jobId).payload, null);
+});
+
+test("registration messages are discarded after verification, expiry or account creation", async t => {
+  const f = fixture(t);
+  for (const [tokenId, email] of [["used", "used@example.test"], ["expired", "expired@example.test"], ["exists", "client@example.test"]]) {
+    f.db.prepare("INSERT INTO email_verifications(id,email,created_at,expires_at) VALUES(?,?,?,?)").run(tokenId, email, f.now, f.now + 1800000);
+    enqueueRegistrationEmail(f.db, { tokenId, now: f.now, letter: { subject: "Confirm", text: "Link" } });
+  }
+  f.db.prepare("DELETE FROM email_verifications WHERE id = 'used'").run();
+  f.db.prepare("UPDATE email_verifications SET expires_at = ? WHERE id = 'expired'").run(f.now);
+  await processMailQueue(f.db, { now: f.now, send: f.send });
+  assert.equal(f.letters.length, 0);
+  assert.equal(f.db.prepare("SELECT count(*) n FROM mail_outbox WHERE payload IS NOT NULL OR status != 'skipped'").get().n, 0);
 });
 
 test("order updates reach the opposite party once and respect verified addresses and preferences", async t => {

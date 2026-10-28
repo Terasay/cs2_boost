@@ -1,14 +1,16 @@
 import { and, eq, gt, lt } from "drizzle-orm";
 import { createHash, randomBytes } from "node:crypto";
+import { after } from "next/server";
 import { getDb } from "@/db";
 import { emailVerifications, notificationPreferences, users } from "@/db/schema";
-import { reserveMailSlot } from "@/lib/notifications.mjs";
+import { enqueueRegistrationEmail, processMailQueue } from "@/lib/notifications.mjs";
+import { accessKey } from "@/lib/order-access.mjs";
 import { cleanAttribution } from "@/lib/attribution.mjs";
 import { ratingValue } from "@/lib/order-validation";
 import { resolvePromo } from "@/lib/wallet.mjs";
 import { validateRatings } from "@/lib/pricing.mjs";
 import { publicOrigin } from "@/lib/server-config.mjs";
-import { mailConfig, sendEmail, verificationLetter } from "@/lib/mail.mjs";
+import { mailConfig, verificationLetter } from "@/lib/mail.mjs";
 import { jsonInput, privateJson } from "../request-security";
 import { createSession, deleteSession, hashPassword } from "./auth-lib";
 import { chargeAttempt, rateKey } from "./rate-limit";
@@ -31,39 +33,40 @@ function registrationDraft(input: unknown) {
 }
 
 export async function requestRegistration(request: Request) {
+  const started = Date.now();
   const retry = await chargeAttempt(await rateKey("register", request), 5, 60 * 60_000);
   if (retry) return fail("Too many attempts. Try again later", 429, retry);
   const input = await jsonInput(request);
   if (!input) return fail("Invalid request");
   const email = typeof input.email === "string" ? input.email.trim().toLowerCase() : "";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return fail("Enter a valid email");
-  try { mailConfig(); } catch { return fail("Registration email unavailable. Try again later", 503); }
+  try { mailConfig(); accessKey(); } catch { return fail("Registration email unavailable. Try again later", 503); }
   const cooldown = await chargeAttempt(await rateKey("registration-email-cooldown", null, email), 1, 60_000);
   if (cooldown) return fail("Wait before requesting another email", 429, cooldown);
   const emailLimit = await chargeAttempt(await rateKey("registration-email", null, email), 5, 60 * 60_000);
   if (emailLimit) return fail("Too many attempts. Try again later", 429, emailLimit);
-  const db = getDb();
-  const [existing] = db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1).all();
-  const accepted = () => privateJson({ verificationRequired: true, retryAfter: 60 }, 202);
-  if (existing) return accepted();
+  const origin = publicOrigin(request);
   const quota = await chargeAttempt(await rateKey("registration-mail-day", null, new Date().toISOString().slice(0, 10)), 90, 86400_000);
-  if (quota) return fail("Registration email unavailable. Try again later", 503);
-  if (!reserveMailSlot(db.$client, true)) return fail("Registration email unavailable. Try again later", 503);
-  const token = randomBytes(32).toString("hex");
-  const id = digest(token);
-  const now = Date.now();
-  db.delete(emailVerifications).where(lt(emailVerifications.expiresAt, now)).run();
-  const draft = registrationDraft(input.draft);
-  db.insert(emailVerifications).values({ id, email, createdAt: now, expiresAt: now + 30 * 60_000, draft: JSON.stringify({ ...(draft ? { draft, attribution: cleanAttribution(input.attribution) } : {}), language: input.lang === "en" ? "en" : "ru" }) }).run();
-  const lang = input.lang === "en" ? "en" : "ru";
-  const url = `${publicOrigin(request)}/verify-email#token=${token}&lang=${lang}`;
-  try {
-    await sendEmail({ to: email, ...verificationLetter(url, lang), idempotencyKey: `registration-${id}` });
-  } catch (reason) {
-    console.error("Registration email failed", { code: reason instanceof Error ? reason.message : "Delivery failed" });
-    return fail("Registration email unavailable. Try again later", 503);
-  }
-  return accepted();
+  const db = getDb();
+  const jobId = quota ? null : db.transaction(tx => {
+    const existing = tx.select({ id: users.id }).from(users).where(eq(users.email, email)).get();
+    if (existing) return null;
+    const token = randomBytes(32).toString("hex");
+    const id = digest(token);
+    const now = Date.now();
+    tx.delete(emailVerifications).where(lt(emailVerifications.expiresAt, now)).run();
+    const draft = registrationDraft(input.draft);
+    const lang = input.lang === "en" ? "en" : "ru";
+    tx.insert(emailVerifications).values({ id, email, createdAt: now, expiresAt: now + 30 * 60_000, draft: JSON.stringify({ ...(draft ? { draft, attribution: cleanAttribution(input.attribution) } : {}), language: lang }) }).run();
+    const url = `${origin}/verify-email#token=${token}&lang=${lang}`;
+    return enqueueRegistrationEmail(db.$client, { tokenId: id, letter: verificationLetter(url, lang), now });
+  });
+  if (jobId) after(async () => {
+    try { await processMailQueue(db.$client, { jobId, limit: 1 }); }
+    catch { console.error("Registration email queued for retry"); }
+  });
+  await new Promise(resolve => setTimeout(resolve, Math.max(0, 250 - (Date.now() - started))));
+  return privateJson({ verificationRequired: true, retryAfter: 60 }, 202);
 }
 
 export async function verifyRegistration(request: Request) {
@@ -87,6 +90,7 @@ export async function verifyRegistration(request: Request) {
     const language = valid.draft ? JSON.parse(valid.draft).language : "ru";
     const [user] = tx.insert(users).values({ id, email: valid.email, passwordHash, role: "client", emailVerifiedAt: Date.now(), createdAt: Date.now() }).onConflictDoNothing().returning({ id: users.id }).all();
     tx.delete(emailVerifications).where(eq(emailVerifications.email, valid.email)).run();
+    db.$client.prepare("UPDATE mail_outbox SET status = 'skipped', payload = NULL, lease_until = 0 WHERE recipient = ? AND kind = 'registration' AND status = 'pending'").run(valid.email);
     if (user) tx.insert(notificationPreferences).values({ userId: id, language: language === "en" ? "en" : "ru" }).run();
     return Boolean(user);
   });

@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
+import { verifySnapshot } from "../db/backup.mjs";
 
 test("fresh migrations, admin promotion, and consistent database backup", () => {
   mkdirSync("work", { recursive: true });
@@ -31,6 +32,15 @@ test("fresh migrations, admin promotion, and consistent database backup", () => 
     run("backup.mjs");
     const files = readdirSync(backups);
     assert.equal(files.length, 1);
+    const backupPath = join(backups, files[0]);
+    run("verify-backup.mjs", [backupPath]);
+    const restoredPath = join(directory, "restored.sqlite");
+    run("verify-backup.mjs", [backupPath, "--restore-to", restoredPath]);
+    assert(verifySnapshot(restoredPath).ok);
+    for (const target of [databasePath, restoredPath, backupPath]) {
+      const result = spawnSync(process.execPath, ["scripts/verify-backup.mjs", backupPath, "--restore-to", target], {env,encoding:"utf8"});
+      assert.notEqual(result.status, 0, "Restores must never replace existing files");
+    }
     const restored = new Database(join(backups, files[0]), { readonly: true });
     try {
       assert.equal(restored.pragma("integrity_check", { simple: true }), "ok");
@@ -38,6 +48,49 @@ test("fresh migrations, admin promotion, and consistent database backup", () => 
       assert.equal(restored.prepare("SELECT count(*) AS n FROM __drizzle_migrations").get().n, JSON.parse(readFileSync("drizzle/meta/_journal.json","utf8")).entries.length);
     } finally { restored.close(); }
   } finally { database.close(); }
+});
+
+test("invalid backups are not published and do not rotate good backups", () => {
+  const directory = mkdtempSync(resolve("work/backup-integrity-test-"));
+  const databasePath = join(directory,"database.sqlite"), backups = join(directory,"backups");
+  const database = new Database(databasePath);
+  try {
+    migrate(drizzle(database),{migrationsFolder:resolve("drizzle")});
+    database.prepare("INSERT INTO users(id,email,password_hash,created_at) VALUES('user','backup@example.test','test-only',?)").run(Date.now());
+    database.exec("INSERT INTO wallet_accounts(user_id,balance) VALUES('user',0)");
+    const env = {...process.env,DATABASE_PATH:databasePath,BACKUP_DIR:backups};
+    const run = () => spawnSync(process.execPath,["scripts/backup.mjs"],{env,encoding:"utf8"});
+    assert.equal(run().status,0);
+    const goodFiles = readdirSync(backups);
+    database.exec("UPDATE wallet_accounts SET balance = 100");
+    const failed = run();
+    assert.notEqual(failed.status,0);
+    assert.match(failed.stderr,/balances do not match/);
+    assert.deepEqual(readdirSync(backups),goodFiles);
+    const corrupt = join(directory,"corrupt.sqlite"); writeFileSync(corrupt,"not a database");
+    assert.throws(()=>verifySnapshot(corrupt));
+  } finally {database.close();}
+});
+
+test("registration queue migration preserves outstanding notifications and permits unregistered recipients", () => {
+  const directory = mkdtempSync(resolve("work/mail-migration-test-"));
+  const previous = join(directory,"previous"); mkdirSync(join(previous,"meta"),{recursive:true});
+  const journal=JSON.parse(readFileSync("drizzle/meta/_journal.json","utf8")); journal.entries=journal.entries.slice(0,14);
+  writeFileSync(join(previous,"meta/_journal.json"),JSON.stringify(journal));
+  for(const entry of journal.entries)copyFileSync(`drizzle/${entry.tag}.sql`,join(previous,`${entry.tag}.sql`));
+  const database = new Database(":memory:");
+  try {
+    database.pragma("foreign_keys = ON");
+    migrate(drizzle(database),{migrationsFolder:previous});
+    database.exec("INSERT INTO users(id,email,password_hash,created_at) VALUES('u','queue@example.test','test-only',1)");
+    database.exec("INSERT INTO mail_outbox(id,user_id,recipient,kind,payload,next_attempt_at,created_at,expires_at) VALUES('old','u','queue@example.test','order','sealed',1,1,9000)");
+    migrate(drizzle(database),{migrationsFolder:resolve("drizzle")});
+    assert.deepEqual(database.prepare("SELECT user_id,payload,status FROM mail_outbox WHERE id='old'").get(),{user_id:"u",payload:"sealed",status:"pending"});
+    database.exec("INSERT INTO mail_outbox(id,recipient,kind,next_attempt_at,created_at,expires_at) VALUES('new','new@example.test','registration',1,1,9000)");
+    assert.equal(database.pragma("foreign_key_check").length,0);
+    database.exec("DELETE FROM users WHERE id='u'");
+    assert.equal(database.prepare("SELECT count(*) n FROM mail_outbox").get().n,1);
+  } finally {database.close();}
 });
 
 test("existing orders retain historical currency, amount and deadline during migration", () => {

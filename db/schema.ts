@@ -51,7 +51,7 @@ export const chatReads = sqliteTable("chat_reads", {
 
 export const mailOutbox = sqliteTable("mail_outbox", {
   id: text("id").primaryKey(),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
   recipient: text("recipient").notNull(),
   kind: text("kind").notNull(),
   parentId: text("parent_id"),
